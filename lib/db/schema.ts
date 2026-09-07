@@ -1,0 +1,328 @@
+/**
+ * Lumina 数据库 Schema (Drizzle ORM + PostgreSQL)
+ *
+ * 认证：Better-Auth (username + password plugin) 复用 users 表作为其 user 表。
+ *   - 登录 ID → username（UUID 字符串），Token → password（better-auth 哈希存 accounts.password）
+ *   - users.tokenHash 另存 Token 的 SHA-256，作为规格要求的审计/自定义校验冗余字段
+ *   - usePlural: true → better-auth 表名为 users/accounts/sessions/verifications
+ *
+ * 业务表关系：
+ *   users ─┬─ teacher_classes ─── classes
+ *          ├─ parent_students  ─── classes (含 student_name)
+ *          ├─ classes.screen_id (大屏 1:1 绑定班级)
+ *          └─ messages.sender_id
+ *   classes ─── messages.target_class_id
+ *
+ * 权限约束（Server Action 层强制，见 lib/rbac.ts）：
+ *   - 家长仅能向 parent_students 中自己关联的 class_id 发消息
+ *   - 教师仅能向 teacher_classes 中自己关联的 class_id 发消息
+ *   - 大屏仅订阅 class-{own_class_id} WS 房间
+ */
+import {
+  boolean,
+  index,
+  pgEnum,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+
+/* -------------------------------------------------------------------------- */
+/* 枚举                                                                        */
+/* -------------------------------------------------------------------------- */
+
+export const userRoleEnum = pgEnum("user_role", [
+  "parent",
+  "teacher",
+  "classroom",
+  "admin",
+]);
+
+export const messageTypeEnum = pgEnum("message_type", ["text", "image", "urgent"]);
+
+export const messageStatusEnum = pgEnum("message_status", [
+  "pending",
+  "delivered",
+  "displayed",
+]);
+
+/* -------------------------------------------------------------------------- */
+/* users — 同时作为 Better-Auth 的 user 表 (usePlural)                          */
+/*   id 用 text 存 UUID 字符串，以兼容 better-auth 的默认 id 类型               */
+/* -------------------------------------------------------------------------- */
+
+export const users = pgTable("users", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  /** 占位 email（better-auth user 必需字段），格式 {id}@lumina.local，不用于登录 */
+  email: text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  image: text("image"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  /** username plugin：登录 ID（UUID 字符串） */
+  username: text("username").notNull().unique(),
+  displayUsername: text("display_username"),
+  /* ---- Lumina 业务字段 ---- */
+  role: userRoleEnum("role").notNull(),
+  /** 登录 Token 的 SHA-256 哈希（审计/自定义校验冗余；密码主校验由 better-auth accounts.password 承担） */
+  tokenHash: text("token_hash").notNull(),
+});
+
+export const usersRelations = relations(users, ({ many }) => ({
+  teachingClasses: many(teacherClasses),
+  children: many(parentStudents),
+  sentMessages: many(messages),
+  classroomFor: many(classes),
+  accounts: many(accounts),
+  sessions: many(sessions),
+}));
+
+/* -------------------------------------------------------------------------- */
+/* accounts — Better-Auth account 表 (usePlural)                                */
+/* -------------------------------------------------------------------------- */
+
+export const accounts = pgTable("accounts", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  providerId: text("provider_id").notNull(),
+  accountId: text("account_id").notNull(),
+  password: text("password"),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  accessTokenExpiresAt: timestamp("access_token_expires_at", {
+    withTimezone: true,
+  }),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at", {
+    withTimezone: true,
+  }),
+  scope: text("scope"),
+  idToken: text("id_token"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const accountsRelations = relations(accounts, ({ one }) => ({
+  user: one(users, {
+    fields: [accounts.userId],
+    references: [users.id],
+  }),
+}));
+
+/* -------------------------------------------------------------------------- */
+/* sessions — Better-Auth session 表 (usePlural)                                */
+/* -------------------------------------------------------------------------- */
+
+export const sessions = pgTable("sessions", {
+  id: text("id").primaryKey(),
+  token: text("token").notNull(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const sessionsRelations = relations(sessions, ({ one }) => ({
+  user: one(users, {
+    fields: [sessions.userId],
+    references: [users.id],
+  }),
+}));
+
+/* -------------------------------------------------------------------------- */
+/* verifications — Better-Auth verification 表 (usePlural)                      */
+/* -------------------------------------------------------------------------- */
+
+export const verifications = pgTable("verifications", {
+  id: text("id").primaryKey(),
+  identifier: text("identifier").notNull(),
+  value: text("value").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+/* -------------------------------------------------------------------------- */
+/* classes                                                                     */
+/* -------------------------------------------------------------------------- */
+
+export const classes = pgTable(
+  "classes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull(),
+    /** 绑定的大屏用户 id，UNIQUE 保证一班一屏 */
+    screenId: text("screen_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [uniqueIndex("classes_screen_id_unique").on(t.screenId)],
+);
+
+export const classesRelations = relations(classes, ({ one, many }) => ({
+  screen: one(users, {
+    fields: [classes.screenId],
+    references: [users.id],
+  }),
+  teachers: many(teacherClasses),
+  students: many(parentStudents),
+  messages: many(messages),
+}));
+
+/* -------------------------------------------------------------------------- */
+/* teacher_classes — 教师 ↔ 班级 多对多                                         */
+/* -------------------------------------------------------------------------- */
+
+export const teacherClasses = pgTable(
+  "teacher_classes",
+  {
+    teacherId: text("teacher_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    classId: uuid("class_id")
+      .notNull()
+      .references(() => classes.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.teacherId, t.classId] })],
+);
+
+export const teacherClassesRelations = relations(teacherClasses, ({ one }) => ({
+  teacher: one(users, {
+    fields: [teacherClasses.teacherId],
+    references: [users.id],
+  }),
+  class: one(classes, {
+    fields: [teacherClasses.classId],
+    references: [classes.id],
+  }),
+}));
+
+/* -------------------------------------------------------------------------- */
+/* parent_students — 家长 ↔ 班级（含学生姓名）                                  */
+/* -------------------------------------------------------------------------- */
+
+export const parentStudents = pgTable(
+  "parent_students",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    parentId: text("parent_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    classId: uuid("class_id")
+      .notNull()
+      .references(() => classes.id, { onDelete: "cascade" }),
+    studentName: text("student_name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("parent_student_unique").on(
+      t.parentId,
+      t.classId,
+      t.studentName,
+    ),
+  ],
+);
+
+export const parentStudentsRelations = relations(parentStudents, ({ one }) => ({
+  parent: one(users, {
+    fields: [parentStudents.parentId],
+    references: [users.id],
+  }),
+  class: one(classes, {
+    fields: [parentStudents.classId],
+    references: [classes.id],
+  }),
+}));
+
+/* -------------------------------------------------------------------------- */
+/* messages                                                                    */
+/*   content: 文本内容 或 Vercel Blob URL（type=image 时）                       */
+/* -------------------------------------------------------------------------- */
+
+export const messages = pgTable(
+  "messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    senderId: text("sender_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    targetClassId: uuid("target_class_id")
+      .notNull()
+      .references(() => classes.id, { onDelete: "cascade" }),
+    content: text("content").notNull(),
+    type: messageTypeEnum("type").notNull(),
+    /** type=image 时记录 MIME（如 image/webp）；文本消息为 null */
+    mimeType: text("mime_type"),
+    status: messageStatusEnum("status").default("pending").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("messages_target_class_idx").on(t.targetClassId),
+    index("messages_created_at_idx").on(t.createdAt),
+  ],
+);
+
+export const messagesRelations = relations(messages, ({ one }) => ({
+  sender: one(users, {
+    fields: [messages.senderId],
+    references: [users.id],
+  }),
+  targetClass: one(classes, {
+    fields: [messages.targetClassId],
+    references: [classes.id],
+  }),
+}));
+
+/* -------------------------------------------------------------------------- */
+/* 派生类型导出                                                                */
+/* -------------------------------------------------------------------------- */
+
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+export type Class = typeof classes.$inferSelect;
+export type NewClass = typeof classes.$inferInsert;
+export type TeacherClass = typeof teacherClasses.$inferSelect;
+export type ParentStudent = typeof parentStudents.$inferSelect;
+export type Message = typeof messages.$inferSelect;
+export type NewMessage = typeof messages.$inferInsert;
+
+export type UserRole = (typeof userRoleEnum.enumValues)[number];
+export type MessageType = (typeof messageTypeEnum.enumValues)[number];
+export type MessageStatus = (typeof messageStatusEnum.enumValues)[number];

@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+:root {
+  --lumina-bg: #ffffff;
+  --lumina-fg: #0a0a0a;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--lumina-bg);
+  color: var(--lumina-fg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 教室大屏端：黑底高对比度，由 /screen 路由通过 class 切换 */
+.screen-mode {
+  --lumina-bg: #000000;
+  --lumina-fg: #ffffff;
+}
