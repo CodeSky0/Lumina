@@ -11,44 +11,54 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function POST() {
-  // 安全闸：已有管理员则关闭引导
-  const existing = await db
-    .select({ id: schema.users.id })
-    .from(schema.users)
-    .where(eq(schema.users.role, "admin"))
-    .limit(1);
-  if (existing.length > 0) {
-    return NextResponse.json(
-      { error: "管理员已存在，引导端点已关闭" },
-      { status: 403 },
-    );
-  }
+  try {
+    // 安全闸：已有管理员则关闭引导
+    const existing = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.role, "admin"))
+      .limit(1);
+    if (existing.length > 0) {
+      return NextResponse.json(
+        { error: "管理员已存在，引导端点已关闭" },
+        { status: 403 },
+      );
+    }
 
-  const username = randomUUID();
-  const token = randomBytes(24).toString("hex");
+    const username = randomUUID();
+    const token = randomBytes(24).toString("hex");
 
-  const res = await auth.api.signUpEmail({
-    body: {
-      email: `${username}@lumina.local`,
+    const res = await auth.api.signUpEmail({
+      body: {
+        email: `${username}@lumina.local`,
+        name: "管理员",
+        password: token,
+        username,
+      },
+      headers: await headers(),
+    });
+    if (!res?.user) {
+      return NextResponse.json({ error: "signUpEmail 返回空" }, { status: 500 });
+    }
+
+    await db
+      .update(schema.users)
+      .set({
+        role: "admin",
+        tokenHash: createHash("sha256").update(token).digest("hex"),
+      })
+      .where(eq(schema.users.id, res.user.id));
+
+    return NextResponse.json({
       name: "管理员",
-      password: token,
       username,
-    },
-    headers: await headers(),
-  });
-  if (!res?.user) {
-    return NextResponse.json({ error: "创建失败" }, { status: 500 });
+      token,
+      hint: "请立即保存！用此 ID + Token 登录 /admin/login",
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    const stack =
+      e instanceof Error ? e.stack?.split("\n").slice(0, 6).join("\n") : undefined;
+    return NextResponse.json({ error: message, stack }, { status: 500 });
   }
-
-  await db
-    .update(schema.users)
-    .set({ role: "admin", tokenHash: createHash("sha256").update(token).digest("hex") })
-    .where(eq(schema.users.id, res.user.id));
-
-  return NextResponse.json({
-    name: "管理员",
-    username,
-    token,
-    hint: "请立即保存！用此 ID + Token 登录 /admin/login",
-  });
 }
