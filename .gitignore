@@ -35,8 +35,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# drizzle
-/drizzle/migrations/meta/_journal.json
+# drizzle (迁移文件需提交，供 Vercel build 时 migrate 使用)
 
 # cloudflare
 /cf-worker/.wrangler
