@@ -2,9 +2,8 @@ name = "lumina-realtime"
 main = "src/index.ts"
 compatibility_date = "2025-03-01"
 
-# 共享密钥：Next.js 调用 /publish 时携带，需与主应用 CF_WORKER_AUTH_TOKEN 一致
-[vars]
-LUMINA_API_TOKEN = "replace-me-in-production"
+# LUMINA_API_TOKEN 通过 `npx wrangler secret put LUMINA_API_TOKEN` 设置，
+# 需与主应用 CF_WORKER_AUTH_TOKEN 一致（不用 [vars] 明文存放）。
 
 # Durable Object 绑定：每个班级一个 RoomDO 实例
 [durable_objects]
@@ -12,6 +11,7 @@ bindings = [
   { name = "ROOM", class_name = "RoomDO" }
 ]
 
+# 免费计划要求 Durable Objects 使用 SQLite-backed（new_sqlite_classes）
 [[migrations]]
 tag = "v1"
-new_classes = ["RoomDO"]
+new_sqlite_classes = ["RoomDO"]
