@@ -28,6 +28,7 @@ export const auth = betterAuth({
   baseURL: getEnv().BETTER_AUTH_URL,
   emailAndPassword: {
     enabled: true,
+    autoSignIn: false,
   },
   plugins: [
     username({
