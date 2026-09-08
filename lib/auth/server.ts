@@ -36,6 +36,8 @@ export const auth = betterAuth({
       usernameValidator: (u) => /^[a-zA-Z0-9-]+$/.test(u),
       /** 禁用归一化，保留 UUID 原样 */
       usernameNormalization: false,
+      /** UUID 36 字符，默认 30 不够 */
+      maxUsernameLength: 100,
     }),
   ],
   user: {
