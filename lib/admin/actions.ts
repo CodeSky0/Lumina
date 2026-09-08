@@ -273,3 +273,48 @@ export async function unbindScreenClass(classId: string): Promise<void> {
     .set({ screenId: null })
     .where(eq(schema.classes.id, classId));
 }
+
+/* ------------------------------ 引导：首个管理员 ------------------------------ */
+
+/** DB 中是否已存在管理员 */
+export async function hasAdmin(): Promise<boolean> {
+  const rows = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(eq(schema.users.role, "admin"))
+    .limit(1);
+  return rows.length > 0;
+}
+
+const createFirstAdminSchema = z.object({
+  name: z.string().min(1).max(50),
+  token: z.string().min(8).max(100),
+});
+
+export type CreateFirstAdminResult =
+  | { ok: true; username: string }
+  | { ok: false; error: string };
+
+/** 创建首个管理员（仅当 DB 无 admin 时可用），返回生成的登录 ID */
+export async function createFirstAdmin(
+  input: z.infer<typeof createFirstAdminSchema>,
+): Promise<CreateFirstAdminResult> {
+  if (await hasAdmin()) return { ok: false, error: "管理员已存在" };
+  const { name, token } = createFirstAdminSchema.parse(input);
+  const username = randomUUID();
+  const res = await auth.api.signUpEmail({
+    body: {
+      email: `${username}@lumina.local`,
+      name,
+      password: token,
+      username,
+    },
+    headers: await headers(),
+  });
+  if (!res?.user) return { ok: false, error: "创建失败" };
+  await db
+    .update(schema.users)
+    .set({ role: "admin", tokenHash: sha256(token) })
+    .where(eq(schema.users.id, res.user.id));
+  return { ok: true, username };
+}

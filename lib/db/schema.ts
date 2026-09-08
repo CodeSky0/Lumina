@@ -72,9 +72,9 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   displayUsername: text("display_username"),
   /* ---- Lumina 业务字段 ---- */
-  role: userRoleEnum("role").notNull(),
+  role: userRoleEnum("role").notNull().default("parent"),
   /** 登录 Token 的 SHA-256 哈希（审计/自定义校验冗余；密码主校验由 better-auth accounts.password 承担） */
-  tokenHash: text("token_hash").notNull(),
+  tokenHash: text("token_hash").notNull().default(""),
 });
 
 export const usersRelations = relations(users, ({ many }) => ({
