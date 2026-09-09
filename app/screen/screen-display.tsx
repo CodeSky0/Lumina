@@ -72,7 +72,6 @@ export default function ScreenDisplay({
   });
   const processedIds = useRef<Set<string>>(new Set());
 
-  // 处理新消息
   useEffect(() => {
     for (const m of messages) {
       if (processedIds.current.has(m.messageId)) continue;
@@ -82,23 +81,22 @@ export default function ScreenDisplay({
     }
   }, [messages]);
 
-  // 轮播 tick
   useEffect(() => {
     const t = setInterval(() => dispatch({ type: "tick" }), 500);
     return () => clearInterval(t);
   }, []);
 
   return (
-    <main className="screen-mode relative min-h-screen overflow-hidden bg-black text-white">
+    <main className="screen-mode relative min-h-screen overflow-hidden bg-neutral-1 text-neutral-9">
       <div
         className={`absolute right-4 top-4 h-3 w-3 rounded-full ${
-          connected ? "bg-green-500" : "bg-red-500"
+          connected ? "bg-success" : "bg-error"
         }`}
       />
 
       {state.current ? <MessageView msg={state.current} /> : <Clock />}
 
-      <div className="absolute bottom-4 left-4 text-sm opacity-40">
+      <div className="absolute bottom-4 left-4 text-copy-14 text-neutral-7">
         {className}
       </div>
     </main>
@@ -125,10 +123,10 @@ function Clock() {
     : "";
   return (
     <div className="flex min-h-screen flex-col items-center justify-center">
-      <div className="font-mono text-[12rem] leading-none tabular-nums">
+      <div className="font-mono text-[12rem] leading-none tabular-nums text-neutral-10">
         {time}
       </div>
-      <div className="mt-6 text-4xl opacity-70">{date}</div>
+      <div className="mt-6 text-display-36 text-neutral-7">{date}</div>
     </div>
   );
 }
@@ -154,14 +152,16 @@ function MessageView({ msg }: { msg: ScreenMessage }) {
       }`}
     >
       <div
-        className={`w-full max-w-5xl rounded-2xl border-4 p-10 ${
-          isUrgent ? "border-red-500 bg-red-950/40" : "border-white/20"
+        className={`w-full max-w-5xl rounded-2xl p-10 ring-2 ${
+          isUrgent
+            ? "bg-error/10 ring-error"
+            : "bg-neutral-2 ring-border"
         }`}
       >
-        <div className="mb-4 flex items-center gap-3 text-2xl opacity-70">
+        <div className="mb-4 flex items-center gap-3 text-display-36 text-neutral-7">
           <span>{msg.senderName}</span>
           {isUrgent && (
-            <span className="rounded bg-red-600 px-3 py-1 text-xl font-bold text-white">
+            <span className="rounded-md bg-error px-3 py-1 text-title-20 font-medium text-white">
               紧急
             </span>
           )}
@@ -174,10 +174,12 @@ function MessageView({ msg }: { msg: ScreenMessage }) {
               className="max-h-[70vh] w-auto max-w-full rounded-xl object-contain"
             />
           ) : (
-            <p className="text-3xl opacity-50">图片加载中…</p>
+            <p className="text-display-36 text-neutral-6">图片加载中…</p>
           )
         ) : (
-          <p className="text-6xl leading-relaxed">{msg.content}</p>
+          <p className="text-[3.75rem] leading-relaxed text-neutral-10">
+            {msg.content}
+          </p>
         )}
       </div>
     </div>

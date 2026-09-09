@@ -70,14 +70,20 @@ export default function AdminPanel() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-8 p-8">
-      <h1 className="text-3xl font-bold">管理端</h1>
+      <h1 className="font-serif text-title-28 font-medium text-neutral-10">
+        管理端
+      </h1>
       {error && (
-        <p className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</p>
+        <p className="rounded-md bg-neutral-2 p-3 text-copy-13 text-error ring-1 ring-border">
+          {error}
+        </p>
       )}
 
       {/* 创建用户 */}
-      <section className="space-y-3 rounded-xl border p-6">
-        <h2 className="text-xl font-semibold">创建用户</h2>
+      <section className="space-y-4 rounded-xl bg-neutral-2 p-6 ring-1 ring-border">
+        <h2 className="font-serif text-title-20 font-medium text-neutral-9">
+          创建用户
+        </h2>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -92,62 +98,69 @@ export default function AdminPanel() {
           }}
           className="flex flex-wrap items-end gap-3"
         >
-          <label className="space-y-1 text-sm">
-            <span className="block font-medium">角色</span>
-            <select name="role" className="rounded border px-2 py-1.5">
+          <label className="space-y-1.5">
+            <span className="block text-label-12 font-medium text-neutral-9">
+              角色
+            </span>
+            <select
+              name="role"
+              className="rounded-md bg-neutral-1 px-3 py-2 text-copy-14 text-neutral-9 ring-1 ring-border outline-none focus:ring-2 focus:ring-accent"
+            >
               <option value="parent">家长</option>
               <option value="teacher">教师</option>
               <option value="classroom">大屏</option>
               <option value="admin">管理员</option>
             </select>
           </label>
-          <label className="space-y-1 text-sm">
-            <span className="block font-medium">姓名</span>
+          <label className="space-y-1.5">
+            <span className="block text-label-12 font-medium text-neutral-9">
+              姓名
+            </span>
             <input
               name="name"
               required
-              className="rounded border px-2 py-1.5"
+              className="rounded-md bg-neutral-1 px-3 py-2 text-copy-14 text-neutral-9 ring-1 ring-border outline-none focus:ring-2 focus:ring-accent"
             />
           </label>
           <button
             type="submit"
             disabled={pending}
-            className="rounded bg-black px-4 py-1.5 text-white disabled:opacity-50"
+            className="rounded-md bg-accent px-4 py-2 text-copy-14 font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
           >
             创建
           </button>
         </form>
         {created && (
-          <div className="rounded bg-amber-50 p-4 text-sm">
-            <p className="font-semibold text-amber-800">
+          <div className="rounded-md bg-neutral-3 p-4 text-copy-13 ring-1 ring-border">
+            <p className="font-medium text-neutral-10">
               用户已创建 — Token 仅显示一次，请立即保存！
             </p>
-            <p className="mt-2">
+            <p className="mt-2 text-neutral-9">
               姓名：{created.name}（{ROLE_LABELS[created.role]}）
             </p>
-            <p className="mt-1 break-all">
+            <p className="mt-1 break-all text-neutral-9">
               登录 ID：
-              <code className="mx-1">{created.username}</code>
+              <code className="mx-1 font-mono text-copy-13">{created.username}</code>
               <button
                 onClick={() => navigator.clipboard.writeText(created.username)}
-                className="text-blue-600 underline"
+                className="text-accent underline"
               >
                 复制
               </button>
             </p>
-            <p className="mt-1 break-all">
+            <p className="mt-1 break-all text-neutral-9">
               Token：
-              <code className="mx-1">{created.token}</code>
+              <code className="mx-1 font-mono text-copy-13">{created.token}</code>
               <button
                 onClick={() => navigator.clipboard.writeText(created.token)}
-                className="text-blue-600 underline"
+                className="text-accent underline"
               >
                 复制
               </button>
             </p>
             <button
               onClick={() => setCreated(null)}
-              className="mt-2 text-gray-500 underline"
+              className="mt-2 text-neutral-7 underline"
             >
               关闭
             </button>
@@ -156,8 +169,10 @@ export default function AdminPanel() {
       </section>
 
       {/* 创建班级 */}
-      <section className="space-y-3 rounded-xl border p-6">
-        <h2 className="text-xl font-semibold">创建班级</h2>
+      <section className="space-y-4 rounded-xl bg-neutral-2 p-6 ring-1 ring-border">
+        <h2 className="font-serif text-title-20 font-medium text-neutral-9">
+          创建班级
+        </h2>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -167,18 +182,20 @@ export default function AdminPanel() {
           }}
           className="flex items-end gap-3"
         >
-          <label className="space-y-1 text-sm">
-            <span className="block font-medium">班级名称</span>
+          <label className="space-y-1.5">
+            <span className="block text-label-12 font-medium text-neutral-9">
+              班级名称
+            </span>
             <input
               name="name"
               required
-              className="rounded border px-2 py-1.5"
+              className="rounded-md bg-neutral-1 px-3 py-2 text-copy-14 text-neutral-9 ring-1 ring-border outline-none focus:ring-2 focus:ring-accent"
             />
           </label>
           <button
             type="submit"
             disabled={pending}
-            className="rounded bg-black px-4 py-1.5 text-white disabled:opacity-50"
+            className="rounded-md bg-accent px-4 py-2 text-copy-14 font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
           >
             创建
           </button>
@@ -186,8 +203,10 @@ export default function AdminPanel() {
       </section>
 
       {/* 绑定管理 */}
-      <section className="space-y-4 rounded-xl border p-6">
-        <h2 className="text-xl font-semibold">绑定关系</h2>
+      <section className="space-y-4 rounded-xl bg-neutral-2 p-6 ring-1 ring-border">
+        <h2 className="font-serif text-title-20 font-medium text-neutral-9">
+          绑定关系
+        </h2>
 
         {/* 教师↔班级 */}
         <form
@@ -201,9 +220,11 @@ export default function AdminPanel() {
               }),
             );
           }}
-          className="flex flex-wrap items-end gap-2 text-sm"
+          className="flex flex-wrap items-end gap-2"
         >
-          <span className="font-medium">教师↔班级：</span>
+          <span className="text-label-12 font-medium text-neutral-9">
+            教师↔班级：
+          </span>
           <Select
             name="teacherId"
             placeholder="选教师"
@@ -219,7 +240,7 @@ export default function AdminPanel() {
           <button
             type="submit"
             disabled={pending}
-            className="rounded bg-black px-3 py-1.5 text-white disabled:opacity-50"
+            className="rounded-md bg-accent px-3 py-2 text-copy-14 font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
           >
             绑定
           </button>
@@ -239,9 +260,11 @@ export default function AdminPanel() {
             );
             e.currentTarget.reset();
           }}
-          className="flex flex-wrap items-end gap-2 text-sm"
+          className="flex flex-wrap items-end gap-2"
         >
-          <span className="font-medium">家长↔班级：</span>
+          <span className="text-label-12 font-medium text-neutral-9">
+            家长↔班级：
+          </span>
           <Select
             name="parentId"
             placeholder="选家长"
@@ -258,12 +281,12 @@ export default function AdminPanel() {
             name="studentName"
             placeholder="学生姓名"
             required
-            className="rounded border px-2 py-1.5"
+            className="rounded-md bg-neutral-1 px-3 py-2 text-copy-14 text-neutral-9 ring-1 ring-border outline-none focus:ring-2 focus:ring-accent"
           />
           <button
             type="submit"
             disabled={pending}
-            className="rounded bg-black px-3 py-1.5 text-white disabled:opacity-50"
+            className="rounded-md bg-accent px-3 py-2 text-copy-14 font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
           >
             绑定
           </button>
@@ -281,9 +304,11 @@ export default function AdminPanel() {
               }),
             );
           }}
-          className="flex flex-wrap items-end gap-2 text-sm"
+          className="flex flex-wrap items-end gap-2"
         >
-          <span className="font-medium">大屏↔班级：</span>
+          <span className="text-label-12 font-medium text-neutral-9">
+            大屏↔班级：
+          </span>
           <Select
             name="screenUserId"
             placeholder="选大屏"
@@ -299,7 +324,7 @@ export default function AdminPanel() {
           <button
             type="submit"
             disabled={pending}
-            className="rounded bg-black px-3 py-1.5 text-white disabled:opacity-50"
+            className="rounded-md bg-accent px-3 py-2 text-copy-14 font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
           >
             绑定
           </button>
@@ -308,25 +333,28 @@ export default function AdminPanel() {
 
       {/* 列表 */}
       <section className="grid gap-6 md:grid-cols-2">
-        <div className="rounded-xl border p-6">
-          <h2 className="mb-3 text-xl font-semibold">
+        <div className="rounded-xl bg-neutral-2 p-6 ring-1 ring-border">
+          <h2 className="mb-4 font-serif text-title-20 font-medium text-neutral-9">
             用户（{users.length}）
           </h2>
-          <ul className="space-y-1 text-sm">
+          <ul className="space-y-2">
             {users.map((u) => (
-              <li key={u.id} className="flex items-center justify-between">
-                <span>
-                  <span className="mr-2 rounded bg-gray-100 px-1.5 text-xs">
+              <li
+                key={u.id}
+                className="flex items-center justify-between text-copy-14"
+              >
+                <span className="text-neutral-9">
+                  <span className="mr-2 rounded-md bg-neutral-3 px-1.5 py-0.5 text-label-12 text-neutral-7">
                     {ROLE_LABELS[u.role]}
                   </span>
                   {u.name}
-                  <code className="ml-2 text-xs text-gray-500">
+                  <code className="ml-2 font-mono text-label-12 text-neutral-7">
                     {u.username.slice(0, 8)}…
                   </code>
                 </span>
                 <button
                   onClick={() => run(() => deleteUser(u.id))}
-                  className="text-xs text-red-600 underline"
+                  className="text-label-12 text-error underline"
                 >
                   删除
                 </button>
@@ -334,16 +362,18 @@ export default function AdminPanel() {
             ))}
           </ul>
         </div>
-        <div className="rounded-xl border p-6">
-          <h2 className="mb-3 text-xl font-semibold">
+        <div className="rounded-xl bg-neutral-2 p-6 ring-1 ring-border">
+          <h2 className="mb-4 font-serif text-title-20 font-medium text-neutral-9">
             班级（{classes.length}）
           </h2>
-          <ul className="space-y-1 text-sm">
+          <ul className="space-y-2">
             {classes.map((c) => (
-              <li key={c.id}>
+              <li key={c.id} className="text-copy-14 text-neutral-9">
                 {c.name}
                 {c.screenId && (
-                  <span className="ml-2 text-xs text-green-600">已绑大屏</span>
+                  <span className="ml-2 text-label-12 text-success">
+                    已绑大屏
+                  </span>
                 )}
               </li>
             ))}
@@ -352,21 +382,28 @@ export default function AdminPanel() {
       </section>
 
       <section className="grid gap-6 md:grid-cols-2">
-        <div className="rounded-xl border p-6">
-          <h2 className="mb-3 text-xl font-semibold">教师↔班级</h2>
-          <ul className="space-y-1 text-sm">
+        <div className="rounded-xl bg-neutral-2 p-6 ring-1 ring-border">
+          <h2 className="mb-4 font-serif text-title-20 font-medium text-neutral-9">
+            教师↔班级
+          </h2>
+          <ul className="space-y-2">
             {teacherBindings.map((b) => (
-              <li key={`${b.teacherId}-${b.classId}`}>
+              <li
+                key={`${b.teacherId}-${b.classId}`}
+                className="text-copy-14 text-neutral-9"
+              >
                 {b.teacherName} → {b.className}
               </li>
             ))}
           </ul>
         </div>
-        <div className="rounded-xl border p-6">
-          <h2 className="mb-3 text-xl font-semibold">家长↔班级(学生)</h2>
-          <ul className="space-y-1 text-sm">
+        <div className="rounded-xl bg-neutral-2 p-6 ring-1 ring-border">
+          <h2 className="mb-4 font-serif text-title-20 font-medium text-neutral-9">
+            家长↔班级(学生)
+          </h2>
+          <ul className="space-y-2">
             {parentBindings.map((b) => (
-              <li key={b.id}>
+              <li key={b.id} className="text-copy-14 text-neutral-9">
                 {b.parentName} → {b.className}（学生：{b.studentName}）
               </li>
             ))}
@@ -387,7 +424,11 @@ function Select({
   options: { value: string; label: string }[];
 }) {
   return (
-    <select name={name} required className="rounded border px-2 py-1.5">
+    <select
+      name={name}
+      required
+      className="rounded-md bg-neutral-1 px-3 py-2 text-copy-14 text-neutral-9 ring-1 ring-border outline-none focus:ring-2 focus:ring-accent"
+    >
       <option value="" disabled selected>
         {placeholder}
       </option>

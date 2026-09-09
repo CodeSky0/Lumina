@@ -6,7 +6,7 @@ import { authClient } from "@/lib/auth/client";
 import { createFirstAdmin } from "@/lib/admin/actions";
 
 /**
- * 管理端登录/注册&token 登录。
+ * 管理端登录/注册双模式。
  * - hasAdmin=false（首次）：注册首个管理员表单，创建后自动登录。
  * - hasAdmin=true：正常 ID + Token 登录。
  */
@@ -52,27 +52,29 @@ export default function AdminLoginForm({ hasAdmin }: { hasAdmin: boolean }) {
       <main className="flex min-h-screen items-center justify-center p-8">
         <form
           onSubmit={handleRegister}
-          className="w-full max-w-sm space-y-5 rounded-xl border border-amber-300 bg-amber-50 p-8 shadow-sm"
+          className="w-full max-w-sm space-y-6 rounded-xl bg-neutral-2 p-8 ring-1 ring-border"
         >
-          <div>
-            <h1 className="text-2xl font-bold">初始化管理员</h1>
-            <p className="mt-1 text-sm text-amber-800">
+          <div className="space-y-1">
+            <h1 className="font-serif text-title-28 font-medium text-neutral-10">
+              初始化管理员
+            </h1>
+            <p className="text-copy-13 text-neutral-7">
               首次使用 — 创建首个管理员账户
             </p>
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="name" className="text-sm font-medium">
+            <label htmlFor="name" className="text-label-12 font-medium text-neutral-9">
               姓名
             </label>
             <input
               id="name"
               name="name"
               required
-              className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 outline-none focus:border-black"
+              className="w-full rounded-md bg-neutral-1 px-3 py-2 text-copy-14 text-neutral-9 ring-1 ring-border outline-none focus:ring-2 focus:ring-accent"
             />
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="token" className="text-sm font-medium">
+            <label htmlFor="token" className="text-label-12 font-medium text-neutral-9">
               设置 Token（至少 8 位）
             </label>
             <input
@@ -81,11 +83,11 @@ export default function AdminLoginForm({ hasAdmin }: { hasAdmin: boolean }) {
               type="password"
               required
               minLength={8}
-              className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 outline-none focus:border-black"
+              className="w-full rounded-md bg-neutral-1 px-3 py-2 text-copy-14 text-neutral-9 ring-1 ring-border outline-none focus:ring-2 focus:ring-accent"
             />
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="confirm" className="text-sm font-medium">
+            <label htmlFor="confirm" className="text-label-12 font-medium text-neutral-9">
               确认 Token
             </label>
             <input
@@ -94,17 +96,17 @@ export default function AdminLoginForm({ hasAdmin }: { hasAdmin: boolean }) {
               type="password"
               required
               minLength={8}
-              className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 outline-none focus:border-black"
+              className="w-full rounded-md bg-neutral-1 px-3 py-2 text-copy-14 text-neutral-9 ring-1 ring-border outline-none focus:ring-2 focus:ring-accent"
             />
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-copy-13 text-error">{error}</p>}
           {createdId && (
-            <p className="break-all text-xs text-amber-800">
-              登录 ID：<code>{createdId}</code>
+            <p className="break-all text-label-12 text-neutral-7">
+              登录 ID：<code className="text-copy-13 text-neutral-9">{createdId}</code>
               <button
                 type="button"
                 onClick={() => navigator.clipboard.writeText(createdId)}
-                className="ml-1 underline"
+                className="ml-1 text-accent underline"
               >
                 复制
               </button>
@@ -113,7 +115,7 @@ export default function AdminLoginForm({ hasAdmin }: { hasAdmin: boolean }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-black py-2.5 text-white disabled:opacity-50"
+            className="w-full rounded-md bg-accent py-2.5 text-copy-14 font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
           >
             {loading ? "创建中…" : "创建并登录"}
           </button>
@@ -147,14 +149,16 @@ export default function AdminLoginForm({ hasAdmin }: { hasAdmin: boolean }) {
     <main className="flex min-h-screen items-center justify-center p-8">
       <form
         onSubmit={handleLogin}
-        className="w-full max-w-sm space-y-5 rounded-xl border border-gray-300 p-8 shadow-sm"
+        className="w-full max-w-sm space-y-6 rounded-xl bg-neutral-2 p-8 ring-1 ring-border"
       >
-        <div>
-          <h1 className="text-2xl font-bold">管理端登录</h1>
-          <p className="mt-1 text-sm text-gray-600">Lumina · 仅限管理员</p>
+        <div className="space-y-1">
+          <h1 className="font-serif text-title-28 font-medium text-neutral-10">
+            管理端登录
+          </h1>
+          <p className="text-copy-13 text-neutral-7">Lumina · 仅限管理员</p>
         </div>
         <div className="space-y-1.5">
-          <label htmlFor="id" className="text-sm font-medium">
+          <label htmlFor="id" className="text-label-12 font-medium text-neutral-9">
             ID
           </label>
           <input
@@ -162,11 +166,11 @@ export default function AdminLoginForm({ hasAdmin }: { hasAdmin: boolean }) {
             name="id"
             autoComplete="username"
             required
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-black"
+            className="w-full rounded-md bg-neutral-1 px-3 py-2 text-copy-14 text-neutral-9 ring-1 ring-border outline-none focus:ring-2 focus:ring-accent"
           />
         </div>
         <div className="space-y-1.5">
-          <label htmlFor="token" className="text-sm font-medium">
+          <label htmlFor="token" className="text-label-12 font-medium text-neutral-9">
             Token
           </label>
           <input
@@ -175,14 +179,14 @@ export default function AdminLoginForm({ hasAdmin }: { hasAdmin: boolean }) {
             type="password"
             autoComplete="current-password"
             required
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-black"
+            className="w-full rounded-md bg-neutral-1 px-3 py-2 text-copy-14 text-neutral-9 ring-1 ring-border outline-none focus:ring-2 focus:ring-accent"
           />
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-copy-13 text-error">{error}</p>}
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-black py-2.5 text-white disabled:opacity-50"
+          className="w-full rounded-md bg-accent py-2.5 text-copy-14 font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
         >
           {loading ? "登录中…" : "登录"}
         </button>

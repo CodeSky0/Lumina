@@ -12,7 +12,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" className="font-sans">
       <body className="min-h-screen antialiased">{children}</body>
     </html>
   );

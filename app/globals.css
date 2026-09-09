@@ -1,24 +1,90 @@
 @import "tailwindcss";
+@import "@yohaku/design-system/tokens.css";
 
+/*
+ * Lumina × Yohaku Design System
+ * Runtime variables that tokens.css expects from the host app.
+ */
+
+/* ---- Light mode (default) ---- */
 :root {
-  --lumina-bg: #ffffff;
-  --lumina-fg: #0a0a0a;
+  --surface-paper: #fefefb;
+  --app-font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --app-font-serif: "Noto Serif CJK SC", "Source Han Serif SC", serif;
+  --bg-opacity: 1;
+  --color-border: rgba(24, 24, 27, 0.1);
 }
 
-html,
-body {
-  height: 100%;
+/* ---- Dark mode — pure gray inversion (R=G=B) ---- */
+.dark {
+  --surface-paper: rgb(28, 28, 30);
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-neutral-1: #141414;
+  --color-neutral-2: #242424;
+  --color-neutral-3: #404040;
+  --color-neutral-4: #5c5c5c;
+  --color-neutral-5: #787878;
+  --color-neutral-6: #a8a8a8;
+  --color-neutral-7: #d0d0d0;
+  --color-neutral-8: #e3e3e3;
+  --color-neutral-9: #f0f0f0;
+  --color-neutral-10: #f9f9f9;
+}
+
+/* ---- Type scale (npm v0.0.2 缺少，v0.0.3 有) ---- */
+@theme {
+  --text-caption-10: 10px;
+  --text-caption-10--line-height: 1.4;
+  --text-label-12: 12px;
+  --text-label-12--line-height: 1.5;
+  --text-copy-13: 13px;
+  --text-copy-13--line-height: 1.54;
+  --text-copy-14: 14px;
+  --text-copy-14--line-height: 1.57;
+  --text-copy-15: 15px;
+  --text-copy-15--line-height: 1.6;
+  --text-copy-16: 16px;
+  --text-copy-16--line-height: 1.625;
+  --text-title-20: 20px;
+  --text-title-20--line-height: 1.4;
+  --text-title-24: 24px;
+  --text-title-24--line-height: 1.33;
+  --text-title-28: 28px;
+  --text-title-28--line-height: 1.29;
+  --text-display-36: 36px;
+  --text-display-36--line-height: 1.22;
+  --text-display-48: 48px;
+  --text-display-48--line-height: 1.17;
+  --text-icon-sm: 14px;
+  --text-icon-md: 16px;
+  --text-icon-lg: 18px;
+}
+
+/* ---- Base ---- */
+html {
+  font-size: 14px;
+  letter-spacing: 0.01em;
 }
 
 body {
-  background-color: var(--lumina-bg);
-  color: var(--lumina-fg);
+  background-color: var(--color-paper);
+  color: var(--color-neutral-9);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-/* 教室大屏端：黑底高对比度，由 /screen 路由通过 class 切换 */
+/* ---- 教室大屏：纯黑高对比 ---- */
 .screen-mode {
-  --lumina-bg: #000000;
-  --lumina-fg: #ffffff;
+  --surface-paper: #000000;
+  --color-neutral-1: #000000;
+  --color-neutral-2: #0a0a0a;
+  --color-neutral-3: #1a1a1a;
+  --color-neutral-4: #2a2a2a;
+  --color-neutral-5: #444444;
+  --color-neutral-6: #666666;
+  --color-neutral-7: #888888;
+  --color-neutral-8: #aaaaaa;
+  --color-neutral-9: #ffffff;
+  --color-neutral-10: #ffffff;
+  --color-border: rgba(255, 255, 255, 0.15);
 }

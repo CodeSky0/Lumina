@@ -26,7 +26,6 @@ export default function ParentPanel({ parentName }: { parentName: string }) {
   useEffect(() => {
     void getMyClasses().then((cs) => {
       setClasses(cs);
-      // 家长仅显示孩子所在班级，默认选第一个
       if (cs.length > 0) setSelectedClassId(cs[0]!.classId);
     });
   }, []);
@@ -65,26 +64,29 @@ export default function ParentPanel({ parentName }: { parentName: string }) {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-bold">家长端</h1>
-        <p className="text-sm text-gray-600">{parentName}</p>
+      <div className="space-y-1">
+        <h1 className="font-serif text-title-28 font-medium text-neutral-10">
+          家长端
+        </h1>
+        <p className="text-copy-13 text-neutral-7">{parentName}</p>
       </div>
 
       {classes.length === 0 ? (
-        <p className="text-gray-500">尚未关联孩子班级，请联系管理员绑定。</p>
+        <p className="text-copy-14 text-neutral-7">
+          尚未关联孩子班级，请联系管理员绑定。
+        </p>
       ) : (
         <>
-          {/* 多孩子时显示班级选择（均为孩子所在班，非任意切换） */}
           {classes.length > 1 && (
             <div className="flex gap-2">
               {classes.map((c) => (
                 <button
                   key={c.classId}
                   onClick={() => setSelectedClassId(c.classId)}
-                  className={`rounded-lg px-3 py-1.5 text-sm ${
+                  className={`rounded-lg px-3 py-2 text-copy-14 transition-colors ${
                     selectedClassId === c.classId
-                      ? "bg-black text-white"
-                      : "border"
+                      ? "bg-accent text-white"
+                      : "bg-neutral-2 text-neutral-9 ring-1 ring-border hover:bg-neutral-3"
                   }`}
                 >
                   {c.className}（{c.studentName}）
@@ -95,18 +97,18 @@ export default function ParentPanel({ parentName }: { parentName: string }) {
 
           {selectedClass && (
             <>
-              <section className="rounded-xl border p-5">
-                <h2 className="mb-3 text-lg font-semibold">
+              <section className="space-y-4 rounded-xl bg-neutral-2 p-5 ring-1 ring-border">
+                <h2 className="font-serif text-title-20 font-medium text-neutral-9">
                   发送消息 — {selectedClass.className}
                   {selectedClass.studentName &&
                     `（学生：${selectedClass.studentName}）`}
                 </h2>
-                <form onSubmit={handleSend} className="space-y-3">
+                <form onSubmit={handleSend} className="space-y-4">
                   <textarea
                     name="text"
                     rows={3}
                     placeholder="输入消息…"
-                    className="w-full rounded-lg border px-3 py-2"
+                    className="w-full rounded-lg bg-neutral-1 px-3 py-2 text-copy-14 text-neutral-9 ring-1 ring-border outline-none focus:ring-2 focus:ring-accent"
                   />
                   <div className="flex items-center gap-4">
                     <input
@@ -118,32 +120,34 @@ export default function ParentPanel({ parentName }: { parentName: string }) {
                     <button
                       type="submit"
                       disabled={pending}
-                      className="rounded-lg bg-black px-4 py-2 text-white disabled:opacity-50"
+                      className="rounded-md bg-accent px-4 py-2 text-copy-14 font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
                     >
                       {pending ? "发送中…" : "发送"}
                     </button>
                   </div>
                   {feedback && (
-                    <p className="text-sm text-red-600">{feedback}</p>
+                    <p className="text-copy-13 text-error">{feedback}</p>
                   )}
                 </form>
               </section>
 
-              <section className="rounded-xl border p-5">
-                <h2 className="mb-3 text-lg font-semibold">消息与送达状态</h2>
+              <section className="space-y-4 rounded-xl bg-neutral-2 p-5 ring-1 ring-border">
+                <h2 className="font-serif text-title-20 font-medium text-neutral-9">
+                  消息与送达状态
+                </h2>
                 <ul className="space-y-3">
                   {messages.map((m) => (
                     <li
                       key={m.id}
-                      className={`rounded-lg border p-3 text-sm ${
-                        m.type === "urgent" ? "border-red-400 bg-red-50" : ""
+                      className={`rounded-lg bg-neutral-1 p-3 text-copy-14 ring-1 ${
+                        m.type === "urgent" ? "ring-error" : "ring-border"
                       }`}
                     >
-                      <div className="mb-1 flex items-center justify-between text-xs text-gray-500">
+                      <div className="mb-1.5 flex items-center justify-between text-label-12 text-neutral-7">
                         <span>
                           {m.senderName}
                           {m.type === "urgent" && (
-                            <span className="ml-2 font-semibold text-red-600">
+                            <span className="ml-2 font-medium text-error">
                               紧急
                             </span>
                           )}
@@ -159,15 +163,17 @@ export default function ParentPanel({ parentName }: { parentName: string }) {
                         <img
                           src={m.content}
                           alt="图片消息"
-                          className="max-h-48 rounded"
+                          className="max-h-48 rounded-md"
                         />
                       ) : (
-                        <p className="whitespace-pre-wrap">{m.content}</p>
+                        <p className="whitespace-pre-wrap text-neutral-9">
+                          {m.content}
+                        </p>
                       )}
                     </li>
                   ))}
                   {messages.length === 0 && (
-                    <p className="text-sm text-gray-400">暂无消息</p>
+                    <p className="text-copy-13 text-neutral-6">暂无消息</p>
                   )}
                 </ul>
               </section>
