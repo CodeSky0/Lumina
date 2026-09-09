@@ -4,14 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth/client";
 
-/** 登录后按 role 重定向至对应 Dashboard */
-const ROLE_HOME: Record<string, string> = {
-  parent: "/parent",
-  teacher: "/teacher",
-  classroom: "/screen",
-  admin: "/admin",
-};
-
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -34,8 +26,7 @@ export default function LoginPage() {
         setError(result.error.message ?? "ID 或 Token 错误");
         return;
       }
-      const role = (result.data?.user as { role?: string } | undefined)?.role;
-      router.push(ROLE_HOME[role ?? ""] ?? "/login");
+      router.push("/dashboard");
     } catch {
       setError("登录失败，请重试");
     } finally {

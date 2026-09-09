@@ -136,12 +136,6 @@ export default function AdminLoginForm({ hasAdmin }: { hasAdmin: boolean }) {
           setError(result.error.message ?? "ID 或 Token 错误");
           return;
         }
-        const role = (result.data?.user as { role?: string } | undefined)?.role;
-        if (role !== "admin") {
-          await authClient.signOut();
-          setError("非管理员账号，禁止访问管理端");
-          return;
-        }
         router.push("/admin");
       } catch {
         setError("登录失败，请重试");
