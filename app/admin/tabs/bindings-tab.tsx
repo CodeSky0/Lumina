@@ -106,14 +106,15 @@ export function BindingsTab({
 
   function handleBindTeacher(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const f = new FormData(form);
     startTransition(async () => {
       try {
         await bindTeacherClass({
           teacherId: String(f.get("teacherId")),
           classId: String(f.get("classId")),
         });
-        e.currentTarget.reset();
+        form.reset();
         await onRefresh();
         show("success", "教师绑定成功");
       } catch (e) {
@@ -124,7 +125,8 @@ export function BindingsTab({
 
   function handleBindParent(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const f = new FormData(form);
     startTransition(async () => {
       try {
         await bindParentStudent({
@@ -132,7 +134,7 @@ export function BindingsTab({
           classId: String(f.get("classId")),
           studentName: String(f.get("studentName")),
         });
-        e.currentTarget.reset();
+        form.reset();
         await onRefresh();
         show("success", "家长绑定成功");
       } catch (e) {
@@ -143,14 +145,15 @@ export function BindingsTab({
 
   function handleBindScreen(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const f = new FormData(form);
     startTransition(async () => {
       try {
         await bindScreenClass({
           screenUserId: String(f.get("screenUserId")),
           classId: String(f.get("classId")),
         });
-        e.currentTarget.reset();
+        form.reset();
         await onRefresh();
         show("success", "大屏绑定成功");
       } catch (e) {
