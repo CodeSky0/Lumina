@@ -50,6 +50,11 @@ export const messageStatusEnum = pgEnum("message_status", [
   "displayed",
 ]);
 
+export const conversationTypeEnum = pgEnum("conversation_type", [
+  "group",
+  "direct",
+]);
+
 /* -------------------------------------------------------------------------- */
 /* users — 同时作为 Better-Auth 的 user 表 (usePlural)                          */
 /*   id 用 text 存 UUID 字符串，以兼容 better-auth 的默认 id 类型               */
@@ -197,6 +202,57 @@ export const classesRelations = relations(classes, ({ one, many }) => ({
   teachers: many(teacherClasses),
   students: many(parentStudents),
   messages: many(messages),
+  groupConversations: many(conversations),
+}));
+
+/* -------------------------------------------------------------------------- */
+/* conversations — 会话（班级群聊 / 私信）                                      */
+/* -------------------------------------------------------------------------- */
+
+export const conversations = pgTable(
+  "conversations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    type: conversationTypeEnum("type").notNull(),
+    /** 群聊时关联班级 */
+    classId: uuid("class_id").references(() => classes.id, {
+      onDelete: "cascade",
+    }),
+    /** 私信时参与者A（通常为教师） */
+    participantAId: text("participant_a_id").references(() => users.id, {
+      onDelete: "cascade",
+    }),
+    /** 私信时参与者B（通常为家长） */
+    participantBId: text("participant_b_id").references(() => users.id, {
+      onDelete: "cascade",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("conversations_class_idx").on(t.classId),
+    index("conversations_participant_a_idx").on(t.participantAId),
+    index("conversations_participant_b_idx").on(t.participantBId),
+  ],
+);
+
+export const conversationsRelations = relations(conversations, ({ one, many }) => ({
+  class: one(classes, {
+    fields: [conversations.classId],
+    references: [classes.id],
+  }),
+  participantA: one(users, {
+    fields: [conversations.participantAId],
+    references: [users.id],
+    relationName: "conversationParticipantA",
+  }),
+  participantB: one(users, {
+    fields: [conversations.participantBId],
+    references: [users.id],
+    relationName: "conversationParticipantB",
+  }),
+  messages: many(messages),
 }));
 
 /* -------------------------------------------------------------------------- */
@@ -281,9 +337,9 @@ export const messages = pgTable(
     senderId: text("sender_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    targetClassId: uuid("target_class_id")
+    conversationId: uuid("conversation_id")
       .notNull()
-      .references(() => classes.id, { onDelete: "cascade" }),
+      .references(() => conversations.id, { onDelete: "cascade" }),
     content: text("content").notNull(),
     type: messageTypeEnum("type").notNull(),
     /** type=image 时记录 MIME（如 image/webp）；文本消息为 null */
@@ -294,7 +350,7 @@ export const messages = pgTable(
       .notNull(),
   },
   (t) => [
-    index("messages_target_class_idx").on(t.targetClassId),
+    index("messages_conversation_idx").on(t.conversationId),
     index("messages_created_at_idx").on(t.createdAt),
   ],
 );
@@ -304,9 +360,9 @@ export const messagesRelations = relations(messages, ({ one }) => ({
     fields: [messages.senderId],
     references: [users.id],
   }),
-  targetClass: one(classes, {
-    fields: [messages.targetClassId],
-    references: [classes.id],
+  conversation: one(conversations, {
+    fields: [messages.conversationId],
+    references: [conversations.id],
   }),
 }));
 
@@ -320,9 +376,12 @@ export type Class = typeof classes.$inferSelect;
 export type NewClass = typeof classes.$inferInsert;
 export type TeacherClass = typeof teacherClasses.$inferSelect;
 export type ParentStudent = typeof parentStudents.$inferSelect;
+export type Conversation = typeof conversations.$inferSelect;
+export type NewConversation = typeof conversations.$inferInsert;
 export type Message = typeof messages.$inferSelect;
 export type NewMessage = typeof messages.$inferInsert;
 
 export type UserRole = (typeof userRoleEnum.enumValues)[number];
 export type MessageType = (typeof messageTypeEnum.enumValues)[number];
 export type MessageStatus = (typeof messageStatusEnum.enumValues)[number];
+export type ConversationType = (typeof conversationTypeEnum.enumValues)[number];

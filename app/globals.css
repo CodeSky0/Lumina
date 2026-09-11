@@ -80,19 +80,3 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
-
-/* ---- 教室大屏：纯黑高对比 ---- */
-.screen-mode {
-  --surface-paper: #000000;
-  --color-neutral-1: #000000;
-  --color-neutral-2: #0a0a0a;
-  --color-neutral-3: #1a1a1a;
-  --color-neutral-4: #2a2a2a;
-  --color-neutral-5: #444444;
-  --color-neutral-6: #666666;
-  --color-neutral-7: #888888;
-  --color-neutral-8: #aaaaaa;
-  --color-neutral-9: #ffffff;
-  --color-neutral-10: #ffffff;
-  --color-border: rgba(255, 255, 255, 0.15);
-}
