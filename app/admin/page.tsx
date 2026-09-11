@@ -6,5 +6,5 @@ export default async function AdminPage() {
   const session = await getCurrentSession();
   if (!session || session.user.role !== "admin") redirect("/admin/login");
 
-  return <AdminPanel />;
+  return <AdminPanel adminName={session.user.name} />;
 }

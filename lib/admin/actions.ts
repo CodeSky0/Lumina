@@ -120,6 +120,9 @@ export type ClassListItem = {
   id: string;
   name: string;
   screenId: string | null;
+  screenName: string | null;
+  teacherCount: number;
+  studentCount: number;
 };
 
 export async function listClasses(): Promise<ClassListItem[]> {
@@ -129,10 +132,44 @@ export async function listClasses(): Promise<ClassListItem[]> {
       id: schema.classes.id,
       name: schema.classes.name,
       screenId: schema.classes.screenId,
+      screenName: schema.users.name,
     })
     .from(schema.classes)
+    .leftJoin(schema.users, eq(schema.classes.screenId, schema.users.id))
     .orderBy(schema.classes.name);
-  return rows;
+
+  const teacherCounts = await Promise.all(
+    rows.map((r) =>
+      db
+        .select({ id: schema.teacherClasses.teacherId })
+        .from(schema.teacherClasses)
+        .where(eq(schema.teacherClasses.classId, r.id))
+        .then((rows) => rows.length),
+    ),
+  );
+  const studentCounts = await Promise.all(
+    rows.map((r) =>
+      db
+        .select({ id: schema.parentStudents.id })
+        .from(schema.parentStudents)
+        .where(eq(schema.parentStudents.classId, r.id))
+        .then((rows) => rows.length),
+    ),
+  );
+
+  return rows.map((r, i) => ({
+    id: r.id,
+    name: r.name,
+    screenId: r.screenId,
+    screenName: r.screenName,
+    teacherCount: teacherCounts[i] ?? 0,
+    studentCount: studentCounts[i] ?? 0,
+  }));
+}
+
+export async function deleteClass(classId: string): Promise<void> {
+  await requireUser("admin");
+  await db.delete(schema.classes).where(eq(schema.classes.id, classId));
 }
 
 /* ------------------------------ 绑定：教师↔班级 ------------------------------ */
