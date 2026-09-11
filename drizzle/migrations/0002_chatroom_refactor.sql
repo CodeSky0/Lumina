@@ -1,4 +1,4 @@
-CREATE TYPE "conversation_type" AS ENUM('group', 'direct');--> statement-breakpoint
+CREATE TYPE "public"."conversation_type" AS ENUM('group', 'direct');--> statement-breakpoint
 CREATE TABLE "conversations" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"type" "conversation_type" NOT NULL,
@@ -14,9 +14,21 @@ ALTER TABLE "conversations" ADD CONSTRAINT "conversations_class_id_classes_id_fk
 ALTER TABLE "conversations" ADD CONSTRAINT "conversations_participant_a_id_users_id_fk" FOREIGN KEY ("participant_a_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "conversations" ADD CONSTRAINT "conversations_participant_b_id_users_id_fk" FOREIGN KEY ("participant_b_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "messages" ADD COLUMN "conversation_id" uuid;--> statement-breakpoint
+INSERT INTO "conversations" ("type", "class_id")
+	SELECT 'group', "target_class_id"
+	FROM "messages"
+	WHERE "target_class_id" IS NOT NULL
+	GROUP BY "target_class_id"
+	ON CONFLICT DO NOTHING;--> statement-breakpoint
+UPDATE "messages" SET "conversation_id" = (
+	SELECT c."id" FROM "conversations" c
+	WHERE c."type" = 'group' AND c."class_id" = "messages"."target_class_id"
+	LIMIT 1
+)
+WHERE "conversation_id" IS NULL AND "target_class_id" IS NOT NULL;--> statement-breakpoint
 ALTER TABLE "messages" DROP CONSTRAINT "messages_target_class_id_classes_id_fk";--> statement-breakpoint
-DROP INDEX "messages_target_class_idx";--> statement-breakpoint
-ALTER TABLE "messages" DROP COLUMN "target_class_id";--> statement-breakpoint
+DROP INDEX IF EXISTS "messages_target_class_idx";--> statement-breakpoint
+ALTER TABLE "messages" DROP COLUMN IF EXISTS "target_class_id";--> statement-breakpoint
 ALTER TABLE "messages" ALTER COLUMN "conversation_id" SET NOT NULL;--> statement-breakpoint
 CREATE INDEX "messages_conversation_idx" ON "messages" USING btree ("conversation_id");--> statement-breakpoint
 ALTER TABLE "messages" ADD CONSTRAINT "messages_conversation_id_conversations_id_fk" FOREIGN KEY ("conversation_id") REFERENCES "public"."conversations"("id") ON DELETE cascade ON UPDATE no action;
