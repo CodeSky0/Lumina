@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "motion/react";
 import { authClient } from "@/lib/auth/client";
 
 export default function LoginPage() {
@@ -36,9 +37,12 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center p-8">
-      <form
+      <motion.form
         onSubmit={handleSubmit}
         className="w-full max-w-sm space-y-6 rounded-xl bg-neutral-2 p-8 ring-1 ring-border"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       >
         <div className="space-y-1">
           <h1 className="font-serif text-title-28 font-medium text-neutral-10">
@@ -79,7 +83,7 @@ export default function LoginPage() {
         >
           {loading ? "登录中…" : "登录"}
         </button>
-      </form>
+      </motion.form>
     </main>
   );
 }

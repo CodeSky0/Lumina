@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { authClient } from "@/lib/auth/client";
 import {
   listClasses,
@@ -60,21 +61,31 @@ export default function AdminPanel({ adminName }: AdminPanelProps) {
           onLogout={() => authClient.signOut()}
         />
         <main className="flex-1 overflow-x-auto p-6">
-          {activeTab === "users" && (
-            <UsersTab users={users} classes={classes} onRefresh={refresh} />
-          )}
-          {activeTab === "classes" && (
-            <ClassesTab classes={classes} onRefresh={refresh} />
-          )}
-          {activeTab === "bindings" && (
-            <BindingsTab
-              users={users}
-              classes={classes}
-              teacherBindings={teacherBindings}
-              parentBindings={parentBindings}
-              onRefresh={refresh}
-            />
-          )}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            >
+              {activeTab === "users" && (
+                <UsersTab users={users} classes={classes} onRefresh={refresh} />
+              )}
+              {activeTab === "classes" && (
+                <ClassesTab classes={classes} onRefresh={refresh} />
+              )}
+              {activeTab === "bindings" && (
+                <BindingsTab
+                  users={users}
+                  classes={classes}
+                  teacherBindings={teacherBindings}
+                  parentBindings={parentBindings}
+                  onRefresh={refresh}
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
     </ToastProvider>

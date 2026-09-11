@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect } from "react";
+import { AnimatePresence, motion } from "motion/react";
 
 interface DialogProps {
   open: boolean;
@@ -20,24 +21,34 @@ export function Dialog({ open, onClose, title, children, className = "" }: Dialo
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
-  if (!open) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
-    >
-      <div
-        className={`w-full max-w-md space-y-4 rounded-xl bg-neutral-2 p-6 ring-1 ring-border ${className}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {title && (
-          <h2 className="font-serif text-title-20 font-medium text-neutral-10">
-            {title}
-          </h2>
-        )}
-        {children}
-      </div>
-    </div>
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={onClose}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+        >
+          <motion.div
+            className={`w-full max-w-md space-y-4 rounded-xl bg-neutral-2 p-6 ring-1 ring-border ${className}`}
+            onClick={(e) => e.stopPropagation()}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+          >
+            {title && (
+              <h2 className="font-serif text-title-20 font-medium text-neutral-10">
+                {title}
+              </h2>
+            )}
+            {children}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

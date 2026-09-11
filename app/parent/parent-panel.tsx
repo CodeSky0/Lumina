@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   getClassMessages,
   getMyClasses,
@@ -140,13 +141,18 @@ export default function ParentPanel({ parentName }: { parentName: string }) {
                   消息与送达状态
                 </h2>
                 <ul className="space-y-3">
-                  {messages.map((m) => (
-                    <li
-                      key={m.id}
-                      className={`rounded-lg bg-neutral-1 p-3 text-copy-14 ring-1 ${
-                        m.type === "urgent" ? "ring-error" : "ring-border"
-                      }`}
-                    >
+                  <AnimatePresence initial={false}>
+                    {messages.map((m) => (
+                      <motion.li
+                        key={m.id}
+                        className={`rounded-lg bg-neutral-1 p-3 text-copy-14 ring-1 ${
+                          m.type === "urgent" ? "ring-error" : "ring-border"
+                        }`}
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                      >
                       <div className="mb-1.5 flex items-center justify-between text-label-12 text-neutral-7">
                         <span>
                           {m.senderName}
@@ -174,8 +180,9 @@ export default function ParentPanel({ parentName }: { parentName: string }) {
                           {m.content}
                         </p>
                       )}
-                    </li>
-                  ))}
+                      </motion.li>
+                    ))}
+                  </AnimatePresence>
                   {messages.length === 0 && (
                     <p className="text-copy-13 text-neutral-6">暂无消息</p>
                   )}

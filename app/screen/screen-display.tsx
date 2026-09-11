@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useReducer, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { useScreenWs } from "@/lib/realtime/use-screen-ws";
 import type { ScreenMessage } from "@/lib/realtime/contract";
 
@@ -94,12 +95,36 @@ export default function ScreenDisplay({
   return (
     <main className="screen-mode relative min-h-screen overflow-hidden bg-neutral-1 text-neutral-9">
       <div
-        className={`absolute right-4 top-4 h-3 w-3 rounded-full ${
-          connected ? "bg-success" : "bg-error"
+        className={`absolute right-4 top-4 h-3 w-3 rounded-full transition-colors duration-slow ease-standard ${
+          connected ? "bg-success" : "bg-error animate-pulse"
         }`}
       />
 
-      {state.current ? <MessageView msg={state.current} /> : <Clock />}
+      <AnimatePresence mode="wait">
+        {state.current ? (
+          <motion.div
+            key="message"
+            initial={{ opacity: 0, scale: 1.05 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute inset-0"
+          >
+            <MessageView msg={state.current} />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="clock"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.05 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute inset-0"
+          >
+            <Clock />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="absolute bottom-4 left-4 text-copy-14 text-neutral-7">
         {className}

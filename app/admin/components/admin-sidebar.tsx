@@ -34,7 +34,7 @@ export function AdminSidebar({
           <button
             key={tab}
             onClick={() => onTabChange(tab)}
-            className={`block w-full rounded-lg px-3 py-2 text-left text-copy-14 transition-colors ${
+            className={`block w-full rounded-lg px-3 py-2 text-left text-copy-14 transition-all duration-fast ease-standard active:scale-[0.98] ${
               activeTab === tab
                 ? "bg-accent text-white"
                 : "text-neutral-9 hover:bg-neutral-3"
@@ -48,7 +48,7 @@ export function AdminSidebar({
       <div className="mt-auto">
         <button
           onClick={onLogout}
-          className="block w-full rounded-lg px-3 py-2 text-left text-copy-14 text-neutral-7 transition-colors hover:bg-neutral-3"
+          className="block w-full rounded-lg px-3 py-2 text-left text-copy-14 text-neutral-7 transition-all duration-fast ease-standard hover:bg-neutral-3 active:scale-[0.98]"
         >
           退出登录
         </button>
