@@ -5,21 +5,26 @@ import { useScreenWs } from "@/lib/realtime/use-screen-ws";
 import type { ScreenMessage } from "@/lib/realtime/contract";
 
 /** 紧急消息提示音（Web Audio API 生成 beep） */
+let audioCtx: AudioContext | null = null;
+
 function beep(): void {
   try {
-    const Ctor =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext: typeof AudioContext })
-        .webkitAudioContext;
-    const ctx = new Ctor();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    if (!audioCtx) {
+      const Ctor =
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
+      audioCtx = new Ctor();
+    }
+    if (audioCtx.state === "suspended") void audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(audioCtx.destination);
     osc.frequency.value = 880;
     gain.gain.value = 0.3;
     osc.start();
-    osc.stop(ctx.currentTime + 0.5);
+    osc.stop(audioCtx.currentTime + 0.5);
   } catch {
     /* 自动播放策略可能阻止，忽略 */
   }

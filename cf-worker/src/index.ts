@@ -89,7 +89,13 @@ export class RoomDO implements DurableObject {
     }
     if (
       typeof payload.classId !== "string" ||
-      typeof payload.messageId !== "string"
+      typeof payload.messageId !== "string" ||
+      typeof payload.senderName !== "string" ||
+      typeof payload.type !== "string" ||
+      !["text", "image", "urgent"].includes(payload.type) ||
+      typeof payload.content !== "string" ||
+      (payload.mimeType !== null && typeof payload.mimeType !== "string") ||
+      typeof payload.createdAt !== "string"
     ) {
       return new Response("Bad Request", { status: 400 });
     }

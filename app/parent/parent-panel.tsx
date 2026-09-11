@@ -52,12 +52,16 @@ export default function ParentPanel({ parentName }: { parentName: string }) {
       fd.set("file", fileRef.current.files[0]);
     }
     startTransition(async () => {
-      const res = await sendMessage(fd);
-      if (res.ok) {
-        form.reset();
-        void getClassMessages(selectedClassId).then(setMessages);
-      } else {
-        setFeedback(res.error);
+      try {
+        const res = await sendMessage(fd);
+        if (res.ok) {
+          form.reset();
+          void getClassMessages(selectedClassId).then(setMessages);
+        } else {
+          setFeedback(res.error);
+        }
+      } catch {
+        setFeedback("发送失败，请重试");
       }
     });
   }

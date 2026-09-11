@@ -219,6 +219,7 @@ export default function AdminPanel() {
                 classId: String(f.get("classId")),
               }),
             );
+            e.currentTarget.reset();
           }}
           className="flex flex-wrap items-end gap-2"
         >
@@ -303,6 +304,7 @@ export default function AdminPanel() {
                 classId: String(f.get("classId")),
               }),
             );
+            e.currentTarget.reset();
           }}
           className="flex flex-wrap items-end gap-2"
         >
@@ -427,9 +429,10 @@ function Select({
     <select
       name={name}
       required
+      defaultValue=""
       className="rounded-md bg-neutral-1 px-3 py-2 text-copy-14 text-neutral-9 ring-1 ring-border outline-none focus:ring-2 focus:ring-accent"
     >
-      <option value="" disabled selected>
+      <option value="" disabled>
         {placeholder}
       </option>
       {options.map((o) => (

@@ -12,7 +12,7 @@ export default async function ScreenPage() {
   const cfWorkerUrl = process.env.CF_WORKER_URL;
   const wsUrl =
     screenClass && cfWorkerUrl
-      ? `${cfWorkerUrl.replace(/^http/, "ws")}/ws/${screenClass.classId}`
+      ? `${cfWorkerUrl.replace(/\/$/, "").replace(/^http/, "ws")}/ws/${screenClass.classId}`
       : null;
   const className = screenClass?.className ?? "未绑定班级";
 

@@ -49,13 +49,16 @@ export async function sendMessage(
   }
   const { classId, text, file, urgent } = parsed.data;
 
-  // 权限校验（服务端强制）
-  if (user.role === "parent") {
-    await assertParentCanPostToClass(user.id, classId);
-  } else if (user.role === "teacher") {
-    await assertTeacherCanPostToClass(user.id, classId);
-  } else {
-    return { ok: false, error: "仅家长/教师可发送消息" };
+  try {
+    if (user.role === "parent") {
+      await assertParentCanPostToClass(user.id, classId);
+    } else if (user.role === "teacher") {
+      await assertTeacherCanPostToClass(user.id, classId);
+    } else {
+      return { ok: false, error: "仅家长/教师可发送消息" };
+    }
+  } catch {
+    return { ok: false, error: "无权向该班级发送消息" };
   }
 
   let content: string;
@@ -66,7 +69,7 @@ export async function sendMessage(
     const upload = await uploadImage(file);
     if (!upload.ok) return upload;
     content = upload.url;
-    type = "image";
+    type = urgent ? "urgent" : "image";
     mimeType = upload.mimeType;
   } else if (urgent) {
     content = (text ?? "").trim();

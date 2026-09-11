@@ -21,13 +21,14 @@ export function useScreenWs(wsUrl: string | null): {
     if (!wsUrl) return;
     let closed = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let ws: WebSocket | null = null;
 
     function connect() {
-      const ws = new WebSocket(wsUrl!);
+      ws = new WebSocket(wsUrl!);
       ws.onopen = () => {
         setConnected(true);
         if (lastCreatedAt.current) {
-          ws.send(
+          ws!.send(
             JSON.stringify({
               kind: "backfill",
               since: lastCreatedAt.current,
@@ -72,13 +73,17 @@ export function useScreenWs(wsUrl: string | null): {
         setConnected(false);
         if (!closed) timer = setTimeout(connect, RECONNECT_DELAY);
       };
-      ws.onerror = () => ws.close();
+      ws.onerror = () => ws?.close();
     }
 
     connect();
     return () => {
       closed = true;
       if (timer) clearTimeout(timer);
+      if (ws) {
+        ws.onclose = null;
+        ws.close();
+      }
     };
   }, [wsUrl]);
 

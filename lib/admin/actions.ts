@@ -92,7 +92,10 @@ export async function listUsers(): Promise<UserListItem[]> {
 }
 
 export async function deleteUser(userId: string): Promise<void> {
-  await requireUser("admin");
+  const currentUser = await requireUser("admin");
+  if (currentUser.id === userId) {
+    throw new Error("不能删除自己的账户");
+  }
   await db.delete(schema.users).where(eq(schema.users.id, userId));
 }
 
@@ -260,6 +263,21 @@ export async function bindScreenClass(
 ): Promise<void> {
   await requireUser("admin");
   const { screenUserId, classId } = bindScreenSchema.parse(input);
+
+  const [screenUser] = await db
+    .select({ role: schema.users.role })
+    .from(schema.users)
+    .where(eq(schema.users.id, screenUserId))
+    .limit(1);
+  if (!screenUser || screenUser.role !== "classroom") {
+    throw new Error("只能绑定大屏角色的用户");
+  }
+
+  await db
+    .update(schema.classes)
+    .set({ screenId: null })
+    .where(eq(schema.classes.screenId, screenUserId));
+
   await db
     .update(schema.classes)
     .set({ screenId: screenUserId })
@@ -312,6 +330,12 @@ export async function createFirstAdmin(
     headers: await headers(),
   });
   if (!res?.user) return { ok: false, error: "创建失败" };
+
+  if (await hasAdmin()) {
+    await db.delete(schema.users).where(eq(schema.users.id, res.user.id));
+    return { ok: false, error: "管理员已存在" };
+  }
+
   await db
     .update(schema.users)
     .set({ role: "admin", tokenHash: sha256(token) })
