@@ -27,11 +27,19 @@ export default function TeacherPanel({ teacherName }: { teacherName: string }) {
 
   useEffect(() => {
     if (!selectedClassId) return;
-    void getClassMessages(selectedClassId).then(setMessages);
+    let active = true;
+    void getClassMessages(selectedClassId).then((msgs) => {
+      if (active) setMessages(msgs);
+    });
     const t = setInterval(() => {
-      void getClassMessages(selectedClassId).then(setMessages);
+      void getClassMessages(selectedClassId).then((msgs) => {
+        if (active) setMessages(msgs);
+      });
     }, 5000);
-    return () => clearInterval(t);
+    return () => {
+      active = false;
+      clearInterval(t);
+    };
   }, [selectedClassId]);
 
   const selectedClass = classes.find((c) => c.classId === selectedClassId);

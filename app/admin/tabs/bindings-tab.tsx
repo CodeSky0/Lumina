@@ -117,8 +117,8 @@ export function BindingsTab({
         form.reset();
         await onRefresh();
         show("success", "教师绑定成功");
-      } catch (e) {
-        show("error", e instanceof Error ? e.message : "绑定失败");
+      } catch (err) {
+        show("error", err instanceof Error ? err.message : "绑定失败");
       }
     });
   }
@@ -137,8 +137,8 @@ export function BindingsTab({
         form.reset();
         await onRefresh();
         show("success", "家长绑定成功");
-      } catch (e) {
-        show("error", e instanceof Error ? e.message : "绑定失败");
+      } catch (err) {
+        show("error", err instanceof Error ? err.message : "绑定失败");
       }
     });
   }
@@ -156,8 +156,8 @@ export function BindingsTab({
         form.reset();
         await onRefresh();
         show("success", "大屏绑定成功");
-      } catch (e) {
-        show("error", e instanceof Error ? e.message : "绑定失败");
+      } catch (err) {
+        show("error", err instanceof Error ? err.message : "绑定失败");
       }
     });
   }

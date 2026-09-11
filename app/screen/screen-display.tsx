@@ -77,11 +77,16 @@ export default function ScreenDisplay({
     shownAt: 0,
   });
   const processedIds = useRef<Set<string>>(new Set());
+  const MAX_PROCESSED = 500;
 
   useEffect(() => {
     for (const m of messages) {
       if (processedIds.current.has(m.messageId)) continue;
       processedIds.current.add(m.messageId);
+      if (processedIds.current.size > MAX_PROCESSED) {
+        const first = processedIds.current.values().next().value;
+        if (first) processedIds.current.delete(first);
+      }
       if (m.type === "urgent") beep();
       dispatch({ type: "new", msg: m });
     }
@@ -170,6 +175,9 @@ function MessageView({ msg }: { msg: ScreenMessage }) {
       const img = new Image();
       img.onload = () => setImgReady(true);
       img.src = msg.content;
+      return () => {
+        img.onload = null;
+      };
     }
   }, [msg]);
 

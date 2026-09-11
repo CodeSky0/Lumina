@@ -12,6 +12,7 @@ import { uploadImage } from "@/lib/images/upload";
 import {
   assertParentCanPostToClass,
   assertTeacherCanPostToClass,
+  ForbiddenError,
 } from "@/lib/rbac";
 import { toPublishPayload } from "@/lib/realtime/contract";
 import { publishMessage } from "@/lib/realtime/publish";
@@ -57,8 +58,11 @@ export async function sendMessage(
     } else {
       return { ok: false, error: "仅家长/教师可发送消息" };
     }
-  } catch {
-    return { ok: false, error: "无权向该班级发送消息" };
+  } catch (err) {
+    if (err instanceof ForbiddenError) {
+      return { ok: false, error: "无权向该班级发送消息" };
+    }
+    return { ok: false, error: "权限校验失败，请重试" };
   }
 
   let content: string;
