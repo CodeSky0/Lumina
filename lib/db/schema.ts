@@ -450,6 +450,45 @@ export const conversationPreferencesRelations = relations(
 );
 
 /* -------------------------------------------------------------------------- */
+/* notifications — 通知中心                                                    */
+/* -------------------------------------------------------------------------- */
+
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    title: text("title").notNull(),
+    body: text("body"),
+    conversationId: uuid("conversation_id").references(() => conversations.id, {
+      onDelete: "set null",
+    }),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("notifications_user_idx").on(t.userId),
+    index("notifications_created_at_idx").on(t.createdAt),
+  ],
+);
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, {
+    fields: [notifications.userId],
+    references: [users.id],
+  }),
+  conversation: one(conversations, {
+    fields: [notifications.conversationId],
+    references: [conversations.id],
+  }),
+}));
+
+/* -------------------------------------------------------------------------- */
 /* 派生类型导出                                                                */
 /* -------------------------------------------------------------------------- */
 

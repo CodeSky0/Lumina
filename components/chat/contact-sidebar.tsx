@@ -1,6 +1,8 @@
 "use client";
 
 import type { ConversationItem } from "@/lib/messages/actions";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { NotificationBell } from "./notification-bell";
 
 const GROUP_ICON = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -90,6 +92,14 @@ export function ContactSidebar({
             </p>
           </div>
         )}
+      </div>
+
+      <div className="flex items-center justify-between border-t border-border px-4 py-2">
+        <div className="flex items-center gap-1">
+          <NotificationBell />
+          <ThemeToggle />
+        </div>
+        <span className="text-caption-10 text-neutral-5">Lumina 流光</span>
       </div>
     </aside>
   );
