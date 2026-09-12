@@ -13,6 +13,7 @@ import {
 } from "@/lib/rbac";
 import { toPublishPayload, toDirectPublishPayload } from "@/lib/realtime/contract";
 import { publishMessage } from "@/lib/realtime/publish";
+import { createNotification } from "@/lib/notifications/actions";
 import { z } from "zod";
 
 /* ------------------------------ 会话列表 ------------------------------ */
@@ -487,6 +488,70 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
   return items;
 }
 
+/* ------------------------------ 群成员列表（@提及） ------------------------------ */
+
+export type GroupMember = {
+  userId: string;
+  name: string;
+  role: UserRole;
+};
+
+export async function getGroupMembers(
+  conversationId: string,
+): Promise<GroupMember[]> {
+  const session = await getCurrentSession();
+  if (!session) return [];
+  const user = session.user;
+
+  const conv = await db
+    .select()
+    .from(schema.conversations)
+    .where(eq(schema.conversations.id, conversationId))
+    .limit(1);
+  if (conv.length === 0) return [];
+  const conversation = conv[0]!;
+
+  if (conversation.type !== "group" || !conversation.classId) return [];
+
+  try {
+    await assertCanAccessConversation(user.id, user.role, conversation);
+  } catch {
+    return [];
+  }
+
+  const classId = conversation.classId;
+
+  const teachers = await db
+    .select({
+      userId: schema.users.id,
+      name: schema.users.name,
+      role: schema.users.role,
+    })
+    .from(schema.teacherClasses)
+    .innerJoin(schema.users, eq(schema.teacherClasses.teacherId, schema.users.id))
+    .where(eq(schema.teacherClasses.classId, classId));
+
+  const parents = await db
+    .select({
+      userId: schema.users.id,
+      name: schema.users.name,
+      role: schema.users.role,
+    })
+    .from(schema.parentStudents)
+    .innerJoin(schema.users, eq(schema.parentStudents.parentId, schema.users.id))
+    .where(eq(schema.parentStudents.classId, classId));
+
+  const seen = new Set<string>();
+  const members: GroupMember[] = [];
+  for (const m of [...teachers, ...parents]) {
+    if (seen.has(m.userId)) continue;
+    seen.add(m.userId);
+    members.push(m);
+  }
+
+  return members.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
+}
+
 /* ------------------------------ 发送消息 ------------------------------ */
 
 const sendSchema = z.object({
@@ -494,6 +559,7 @@ const sendSchema = z.object({
   text: z.string().max(1000).optional(),
   file: z.instanceof(File).optional(),
   urgent: z.boolean().optional(),
+  mentions: z.string().optional(),
 });
 
 export type SendResult =
@@ -512,11 +578,32 @@ export async function sendMessage(
     text: formData.get("text") || undefined,
     file: formData.get("file") || undefined,
     urgent: formData.get("urgent") === "true",
+    mentions: (formData.get("mentions") as string) || undefined,
   });
   if (!parsed.success) {
     return { ok: false, error: "参数校验失败" };
   }
-  const { conversationId, text, file, urgent } = parsed.data;
+  const { conversationId, text, file, urgent, mentions } = parsed.data;
+
+  let parsedMentions: { userId: string; name: string }[] = [];
+  if (mentions) {
+    try {
+      const raw = JSON.parse(mentions);
+      if (Array.isArray(raw)) {
+        parsedMentions = raw
+          .filter(
+            (m): m is { userId: string; name: string } =>
+              typeof m === "object" &&
+              m !== null &&
+              typeof m.userId === "string" &&
+              typeof m.name === "string",
+          )
+          .slice(0, 50);
+      }
+    } catch {
+      /* ignore invalid mentions */
+    }
+  }
 
   const conv = await db
     .select()
@@ -575,9 +662,25 @@ export async function sendMessage(
       type,
       mimeType,
       status: "delivered",
+      mentions: parsedMentions.length > 0 ? parsedMentions : null,
     })
     .returning();
   if (!msg) return { ok: false, error: "消息写入失败" };
+
+  for (const m of parsedMentions) {
+    if (m.userId === user.id) continue;
+    try {
+      await createNotification({
+        userId: m.userId,
+        type: "mention",
+        title: `${user.name} @提到了你`,
+        body: content.slice(0, 100),
+        conversationId,
+      });
+    } catch {
+      /* notification failure should not block message send */
+    }
+  }
 
   if (conversation.type === "group" && conversation.classId) {
     await publishMessage(
@@ -631,6 +734,7 @@ export type ClassMessage = {
   deletedAt: Date | null;
   editedAt: Date | null;
   editHistory: { content: string; editedAt: string }[] | null;
+  mentions: { userId: string; name: string }[] | null;
   createdAt: Date;
 };
 
@@ -687,6 +791,7 @@ export async function getConversationMessages(
       deletedAt: schema.messages.deletedAt,
       editedAt: schema.messages.editedAt,
       editHistory: schema.messages.editHistory,
+      mentions: schema.messages.mentions,
       createdAt: schema.messages.createdAt,
     })
     .from(schema.messages)

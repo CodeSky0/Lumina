@@ -52,6 +52,59 @@ function FileCard({ content }: { content: string }) {
   );
 }
 
+function renderTextWithMentions(
+  content: string,
+  mentions: { userId: string; name: string }[] | null,
+): React.ReactNode {
+  if (!mentions || mentions.length === 0) {
+    return <p className="whitespace-pre-wrap text-copy-14">{content}</p>;
+  }
+
+  const escapedNames = mentions.map((m) => ({
+    ...m,
+    pattern: `@${m.name}`,
+  }));
+
+  const parts: React.ReactNode[] = [];
+  let remaining = content;
+  let key = 0;
+
+  while (remaining.length > 0) {
+    let earliest = -1;
+    let matchedMention: (typeof escapedNames)[number] | null = null;
+
+    for (const m of escapedNames) {
+      const idx = remaining.indexOf(m.pattern);
+      if (idx !== -1 && (earliest === -1 || idx < earliest)) {
+        earliest = idx;
+        matchedMention = m;
+      }
+    }
+
+    if (earliest === -1 || !matchedMention) {
+      parts.push(<span key={key++}>{remaining}</span>);
+      break;
+    }
+
+    if (earliest > 0) {
+      parts.push(<span key={key++}>{remaining.slice(0, earliest)}</span>);
+    }
+
+    parts.push(
+      <span
+        key={key++}
+        className="rounded bg-accent/20 px-1 font-medium text-accent"
+      >
+        {matchedMention.pattern}
+      </span>,
+    );
+
+    remaining = remaining.slice(earliest + matchedMention.pattern.length);
+  }
+
+  return <p className="whitespace-pre-wrap text-copy-14">{parts}</p>;
+}
+
 export function MessageBubble({
   msg,
   isSelf,
@@ -168,7 +221,7 @@ export function MessageBubble({
               </div>
             </div>
           ) : (
-            <p className="whitespace-pre-wrap text-copy-14">{msg.content}</p>
+            renderTextWithMentions(msg.content, msg.mentions)
           )}
         </div>
         <div className={`mt-1 flex items-center gap-2 text-caption-10 text-neutral-6 ${isSelf ? "justify-end" : "justify-start"}`}>

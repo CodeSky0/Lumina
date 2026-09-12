@@ -123,6 +123,7 @@ export function ChatLayout({
           deletedAt: null,
           editedAt: null,
           editHistory: null,
+          mentions: null,
           createdAt: new Date(m.createdAt),
         }));
       if (newMsgs.length === 0) return prev;
@@ -172,6 +173,7 @@ export function ChatLayout({
             <div className="border-t border-border px-4 py-3">
               <MessageInput
                 conversationId={selected.conversationId}
+                conversationType={selected.type}
                 allowUrgent={allowUrgent}
               />
             </div>

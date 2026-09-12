@@ -352,6 +352,8 @@ export const messages = pgTable(
     editedAt: timestamp("edited_at", { withTimezone: true }),
     /** 编辑历史：[{ content, editedAt }] */
     editHistory: jsonb("edit_history").$type<{ content: string; editedAt: string }[]>(),
+    /** @提及列表：[{ userId, name }] */
+    mentions: jsonb("mentions").$type<{ userId: string; name: string }[]>(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
