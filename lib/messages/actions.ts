@@ -1136,20 +1136,3 @@ export async function getMyClasses(): Promise<MyClass[]> {
   }
   return [];
 }
-
-export async function getMyScreenClass(): Promise<{
-  classId: string;
-  className: string;
-} | null> {
-  const session = await getCurrentSession();
-  if (!session || session.user.role !== "classroom") return null;
-  const rows = await db
-    .select({
-      classId: schema.classes.id,
-      className: schema.classes.name,
-    })
-    .from(schema.classes)
-    .where(eq(schema.classes.screenId, session.user.id))
-    .limit(1);
-  return rows[0] ?? null;
-}

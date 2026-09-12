@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentSession } from "@/lib/auth/session";
-import { getMyScreenClass } from "@/lib/messages/actions";
+import { getMyScreenClass } from "@/lib/messages/queries";
 import ScreenDisplay from "./screen-display";
 
 export default async function ScreenPage() {
