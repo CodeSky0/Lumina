@@ -8,6 +8,7 @@ import {
   ChatWindow,
   MessageInput,
   SearchPanel,
+  AnnouncementBanner,
 } from "./index";
 import {
   getMyConversations,
@@ -172,6 +173,12 @@ export function ChatLayout({
                 />
               )}
             </AnimatePresence>
+            {selected.type === "group" && selected.classId && (
+              <AnnouncementBanner
+                classId={selected.classId}
+                isTeacher={userRole === "teacher"}
+              />
+            )}
             <ChatWindow
               messages={messages}
               currentUserId={currentUserId}

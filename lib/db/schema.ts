@@ -525,6 +525,43 @@ export const pushSubscriptionsRelations = relations(
 );
 
 /* -------------------------------------------------------------------------- */
+/* announcements — 班级公告                                                    */
+/* -------------------------------------------------------------------------- */
+
+export const announcements = pgTable(
+  "announcements",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    classId: uuid("class_id")
+      .notNull()
+      .references(() => classes.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    content: text("content").notNull(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("announcements_class_idx").on(t.classId),
+    index("announcements_created_at_idx").on(t.createdAt),
+  ],
+);
+
+export const announcementsRelations = relations(announcements, ({ one }) => ({
+  class: one(classes, {
+    fields: [announcements.classId],
+    references: [classes.id],
+  }),
+  creator: one(users, {
+    fields: [announcements.createdBy],
+    references: [users.id],
+  }),
+}));
+
+/* -------------------------------------------------------------------------- */
 /* 派生类型导出                                                                */
 /* -------------------------------------------------------------------------- */
 
