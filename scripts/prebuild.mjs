@@ -10,8 +10,14 @@ import { execSync } from "node:child_process";
 
 if (process.env.VERCEL === "1") {
   console.log("▶ Vercel 构建：自动同步数据库 schema…");
-  execSync("drizzle-kit push", { stdio: "inherit" });
-  console.log("✓ 数据库 schema 同步完成");
+  try {
+    execSync("drizzle-kit push", { stdio: "inherit" });
+    console.log("✓ 数据库 schema 同步完成");
+  } catch {
+    console.error(
+      "⚠ 数据库 schema 同步失败，继续构建。请手动运行 npm run db:push 检查。",
+    );
+  }
 } else {
   console.log(
     "ℹ 非部署环境，跳过自动同步（手动执行: npm run db:push）",
