@@ -73,3 +73,40 @@ export async function uploadImage(file: File): Promise<UploadImageResult> {
     size: processed.length,
   };
 }
+
+/* ------------------------------ 通用文件上传 ------------------------------ */
+
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+
+export type UploadFileResult =
+  | { ok: true; url: string; mimeType: string; size: number }
+  | { ok: false; error: string };
+
+export async function uploadFile(file: File): Promise<UploadFileResult> {
+  if (file.size === 0) {
+    return { ok: false, error: "文件为空" };
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    return { ok: false, error: "文件超过 20MB 限制" };
+  }
+  const mime = file.type.toLowerCase() || "application/octet-stream";
+
+  const env = getEnv();
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  const ext = file.name.split(".").pop() || "bin";
+  const filename = `msg-${randomUUID()}.${ext}`;
+  const blob = await put(filename, buffer, {
+    access: "public",
+    contentType: mime,
+    token: env.BLOB_READ_WRITE_TOKEN,
+    addRandomSuffix: false,
+  });
+
+  return {
+    ok: true,
+    url: blob.url,
+    mimeType: mime,
+    size: buffer.length,
+  };
+}

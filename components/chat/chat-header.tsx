@@ -4,10 +4,14 @@ export function ChatHeader({
   title,
   subtitle,
   connected,
+  onSearchToggle,
+  searching,
 }: {
   title: string;
   subtitle?: string;
   connected?: boolean;
+  onSearchToggle?: () => void;
+  searching?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -19,18 +23,36 @@ export function ChatHeader({
           <span className="text-copy-13 text-neutral-7">{subtitle}</span>
         )}
       </div>
-      {connected !== undefined && (
-        <div className="flex items-center gap-1.5">
-          <span
-            className={`h-2 w-2 rounded-full transition-colors duration-slow ease-standard ${
-              connected ? "bg-success" : "bg-error animate-pulse"
+      <div className="flex items-center gap-3">
+        {onSearchToggle && (
+          <button
+            onClick={onSearchToggle}
+            className={`rounded-md p-1.5 transition-colors ${
+              searching
+                ? "bg-accent/10 text-accent"
+                : "text-neutral-6 hover:bg-neutral-2 hover:text-neutral-9"
             }`}
-          />
-          <span className="text-label-12 text-neutral-6">
-            {connected ? "已连接" : "连接中"}
-          </span>
-        </div>
-      )}
+            aria-label="搜索消息"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+          </button>
+        )}
+        {connected !== undefined && (
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`h-2 w-2 rounded-full transition-colors duration-slow ease-standard ${
+                connected ? "bg-success" : "bg-error animate-pulse"
+              }`}
+            />
+            <span className="text-label-12 text-neutral-6">
+              {connected ? "已连接" : "连接中"}
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

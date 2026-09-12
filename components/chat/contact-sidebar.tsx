@@ -149,11 +149,26 @@ function ContactItem({
           <span className="truncate text-copy-13 text-neutral-6">
             {item.lastMessagePreview ?? item.subtitle}
           </span>
-          {item.unreadCount > 0 && (
-            <span className="ml-1 shrink-0 rounded-full bg-error px-1.5 py-0.5 text-caption-10 font-medium text-white">
-              {item.unreadCount > 99 ? "99+" : item.unreadCount}
-            </span>
-          )}
+          <div className="ml-1 flex shrink-0 items-center gap-1">
+            {item.pinned && (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-neutral-5">
+                <path d="M12 17v5" />
+                <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 0-1-1H10a1 1 0 0 0-1 1z" />
+              </svg>
+            )}
+            {item.muted && (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-neutral-5">
+                <path d="M11 5 6 9H2v6h4l5 4z" />
+                <path d="m22 9-6 6" />
+                <path d="m16 9 6 6" />
+              </svg>
+            )}
+            {item.unreadCount > 0 && (
+              <span className={`rounded-full px-1.5 py-0.5 text-caption-10 font-medium text-white ${item.muted ? "bg-neutral-5" : "bg-error"}`}>
+                {item.unreadCount > 99 ? "99+" : item.unreadCount}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </button>

@@ -57,7 +57,6 @@ export function MessageInput({
             ref={fileRef}
             type="file"
             name="file"
-            accept="image/jpeg,image/png,image/webp"
             className="hidden"
           />
         </label>

@@ -21,6 +21,7 @@
 import {
   boolean,
   index,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -42,7 +43,7 @@ export const userRoleEnum = pgEnum("user_role", [
   "admin",
 ]);
 
-export const messageTypeEnum = pgEnum("message_type", ["text", "image", "urgent"]);
+export const messageTypeEnum = pgEnum("message_type", ["text", "image", "urgent", "file", "audio"]);
 
 export const messageStatusEnum = pgEnum("message_status", [
   "pending",
@@ -345,6 +346,12 @@ export const messages = pgTable(
     /** type=image 时记录 MIME（如 image/webp）；文本消息为 null */
     mimeType: text("mime_type"),
     status: messageStatusEnum("status").default("pending").notNull(),
+    /** 撤回时间，null 表示未撤回 */
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    /** 最后编辑时间，null 表示未编辑 */
+    editedAt: timestamp("edited_at", { withTimezone: true }),
+    /** 编辑历史：[{ content, editedAt }] */
+    editHistory: jsonb("edit_history").$type<{ content: string; editedAt: string }[]>(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -402,6 +409,45 @@ export const messageReadsRelations = relations(messageReads, ({ one }) => ({
     references: [conversations.id],
   }),
 }));
+
+/* -------------------------------------------------------------------------- */
+/* conversation_preferences — 用户对会话的偏好（置顶/免打扰）                    */
+/* -------------------------------------------------------------------------- */
+
+export const conversationPreferences = pgTable(
+  "conversation_preferences",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    pinned: boolean("pinned").default(false).notNull(),
+    muted: boolean("muted").default(false).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.conversationId] })],
+);
+
+export const conversationPreferencesRelations = relations(
+  conversationPreferences,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [conversationPreferences.userId],
+      references: [users.id],
+    }),
+    conversation: one(conversations, {
+      fields: [conversationPreferences.conversationId],
+      references: [conversations.id],
+    }),
+  }),
+);
 
 /* -------------------------------------------------------------------------- */
 /* 派生类型导出                                                                */

@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnimatePresence } from "motion/react";
 import {
   ContactSidebar,
   ChatHeader,
   ChatWindow,
   MessageInput,
+  SearchPanel,
 } from "./index";
 import {
   getMyConversations,
@@ -34,6 +36,7 @@ export function ChatLayout({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ClassMessage[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     void getMyConversations().then((cs) => {
@@ -117,6 +120,9 @@ export function ChatLayout({
           type: m.type,
           mimeType: m.mimeType,
           status: "displayed",
+          deletedAt: null,
+          editedAt: null,
+          editHistory: null,
           createdAt: new Date(m.createdAt),
         }));
       if (newMsgs.length === 0) return prev;
@@ -141,7 +147,20 @@ export function ChatLayout({
               title={selected.title}
               subtitle={selected.subtitle}
               connected={connected}
+              onSearchToggle={() => setSearching((v) => !v)}
+              searching={searching}
             />
+            <AnimatePresence>
+              {searching && (
+                <SearchPanel
+                  onClose={() => setSearching(false)}
+                  onSelect={(id) => {
+                    handleSelectConversation(id);
+                    setSearching(false);
+                  }}
+                />
+              )}
+            </AnimatePresence>
             <ChatWindow
               messages={messages}
               currentUserId={currentUserId}
