@@ -1,9 +1,13 @@
 "use client";
 
+import type { PresenceUser } from "@/lib/realtime/contract";
+
 export function ChatHeader({
   title,
   subtitle,
   connected,
+  presence,
+  currentUserId,
   onSearchToggle,
   searching,
   onBack,
@@ -11,10 +15,15 @@ export function ChatHeader({
   title: string;
   subtitle?: string;
   connected?: boolean;
+  presence?: PresenceUser[];
+  currentUserId?: string;
   onSearchToggle?: () => void;
   searching?: boolean;
   onBack?: () => void;
 }) {
+  const onlineOthers = presence?.filter((u) => u.userId !== currentUserId) ?? [];
+  const onlineCount = onlineOthers.length;
+
   return (
     <div className="flex items-center justify-between border-b border-border px-4 py-3">
       <div className="flex items-center gap-2">
@@ -30,12 +39,22 @@ export function ChatHeader({
             </svg>
           </button>
         )}
-        <h2 className="font-serif text-title-20 font-medium text-neutral-10">
-          {title}
-        </h2>
-        {subtitle && (
-          <span className="text-copy-13 text-neutral-7">{subtitle}</span>
-        )}
+        <div className="flex flex-col">
+          <h2 className="font-serif text-title-20 font-medium text-neutral-10">
+            {title}
+          </h2>
+          <div className="flex items-center gap-2">
+            {subtitle && (
+              <span className="text-copy-13 text-neutral-7">{subtitle}</span>
+            )}
+            {connected && onlineCount > 0 && (
+              <span className="flex items-center gap-1 text-label-12 text-success">
+                <span className="h-1.5 w-1.5 rounded-full bg-success" />
+                {onlineCount} 人在线
+              </span>
+            )}
+          </div>
+        </div>
       </div>
       <div className="flex items-center gap-3">
         {onSearchToggle && (

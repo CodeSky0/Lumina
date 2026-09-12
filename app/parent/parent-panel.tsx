@@ -2,9 +2,10 @@
 
 import { ChatLayout } from "@/components/chat/chat-layout";
 
-export default function ParentPanel({ parentName }: { parentName: string }) {
+export default function ParentPanel({ parentId, parentName }: { parentId: string; parentName: string }) {
   return (
     <ChatLayout
+      userId={parentId}
       userName={parentName}
       userRole="parent"
       showStatus

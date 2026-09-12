@@ -5,21 +5,32 @@
  * 适用于教师端、家长端、大屏端。
  */
 import { useEffect, useRef, useState } from "react";
-import { chatMessageSchema, type ChatMessage } from "./contract";
+import {
+  chatMessageSchema,
+  presenceFrameSchema,
+  type ChatMessage,
+  type PresenceUser,
+} from "./contract";
 
 const MAX_QUEUED = 200;
 const RECONNECT_DELAY = 3000;
 
-export function useChatWs(wsUrl: string | null): {
+export function useChatWs(
+  wsUrl: string | null,
+  userInfo?: { userId: string; name: string; role: "parent" | "teacher" | "classroom" | "admin" },
+): {
   messages: ChatMessage[];
   connected: boolean;
+  presence: PresenceUser[];
 } {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [connected, setConnected] = useState(false);
+  const [presence, setPresence] = useState<PresenceUser[]>([]);
   const lastCreatedAt = useRef<string | null>(null);
 
   useEffect(() => {
     setMessages([]);
+    setPresence([]);
     lastCreatedAt.current = null;
     if (!wsUrl) return;
     let closed = false;
@@ -30,6 +41,16 @@ export function useChatWs(wsUrl: string | null): {
       ws = new WebSocket(wsUrl!);
       ws.onopen = () => {
         setConnected(true);
+        if (userInfo) {
+          ws!.send(
+            JSON.stringify({
+              kind: "join",
+              userId: userInfo.userId,
+              name: userInfo.name,
+              role: userInfo.role,
+            }),
+          );
+        }
         if (lastCreatedAt.current) {
           ws!.send(
             JSON.stringify({
@@ -70,10 +91,18 @@ export function useChatWs(wsUrl: string | null): {
             lastCreatedAt.current = msgs[msgs.length - 1]!.createdAt;
             setMessages((prev) => [...prev, ...msgs].slice(-MAX_QUEUED));
           }
+        } else if (frame.kind === "presence") {
+          try {
+            const pf = presenceFrameSchema.parse(raw);
+            setPresence(pf.users);
+          } catch {
+            /* ignore invalid */
+          }
         }
       };
       ws.onclose = () => {
         setConnected(false);
+        setPresence([]);
         if (!closed) timer = setTimeout(connect, RECONNECT_DELAY);
       };
       ws.onerror = () => ws?.close();
@@ -88,7 +117,7 @@ export function useChatWs(wsUrl: string | null): {
         ws.close();
       }
     };
-  }, [wsUrl]);
+  }, [wsUrl, userInfo?.userId, userInfo?.name, userInfo?.role]);
 
-  return { messages, connected };
+  return { messages, connected, presence };
 }

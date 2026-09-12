@@ -59,16 +59,32 @@ export const chatControlSchema = z.object({
   serverTime: z.string().optional(),
 });
 
+export const presenceUserSchema = z.object({
+  userId: z.string(),
+  name: z.string(),
+  role: z.enum(["parent", "teacher", "classroom", "admin"]),
+});
+
+export const presenceFrameSchema = z.object({
+  kind: z.literal("presence"),
+  users: z.array(presenceUserSchema),
+});
+
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
 export type ChatControl = z.infer<typeof chatControlSchema>;
-export type ChatFrame = ChatMessage | ChatControl;
+export type PresenceUser = z.infer<typeof presenceUserSchema>;
+export type PresenceFrame = z.infer<typeof presenceFrameSchema>;
+export type ChatFrame = ChatMessage | ChatControl | PresenceFrame;
 
 /* --------------------------- 客户端 → Worker (WebSocket) -------------------------- */
 
 export const clientFrameSchema = z.object({
-  kind: z.enum(["subscribe", "backfill", "ping"]),
+  kind: z.enum(["subscribe", "backfill", "ping", "join"]),
   room: z.string().optional(),
   since: z.string().optional(),
+  userId: z.string().optional(),
+  name: z.string().optional(),
+  role: z.enum(["parent", "teacher", "classroom", "admin"]).optional(),
 });
 
 export type ClientFrame = z.infer<typeof clientFrameSchema>;

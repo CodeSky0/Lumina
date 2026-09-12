@@ -6,5 +6,5 @@ export default async function TeacherPage() {
   const session = await getCurrentSession();
   if (!session || session.user.role !== "teacher") redirect("/login");
 
-  return <TeacherPanel teacherName={session.user.name} />;
+  return <TeacherPanel teacherId={session.user.id} teacherName={session.user.name} />;
 }

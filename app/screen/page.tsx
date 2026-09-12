@@ -10,5 +10,5 @@ export default async function ScreenPage() {
   const screenClass = await getMyScreenClass();
   const className = screenClass?.className ?? "未绑定班级";
 
-  return <ScreenDisplay className={className} />;
+  return <ScreenDisplay userId={session.user.id} className={className} />;
 }

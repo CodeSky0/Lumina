@@ -20,12 +20,14 @@ import { useChatWs } from "@/lib/realtime/use-chat-ws";
 import { roomNameForClass, roomNameForDirect } from "@/lib/realtime/contract";
 
 export function ChatLayout({
+  userId,
   userName,
   userRole,
   allowUrgent,
   showStatus,
   cfWorkerUrl,
 }: {
+  userId: string;
   userName: string;
   userRole: string;
   allowUrgent?: boolean;
@@ -67,7 +69,10 @@ export function ChatLayout({
           : null
       : null;
 
-  const { messages: wsMessages, connected } = useChatWs(wsUrl);
+  const { messages: wsMessages, connected, presence } = useChatWs(
+    wsUrl,
+    { userId, name: userName, role: userRole as "parent" | "teacher" | "classroom" | "admin" },
+  );
 
   useEffect(() => {
     if (!selectedId) return;
@@ -150,6 +155,8 @@ export function ChatLayout({
               title={selected.title}
               subtitle={selected.subtitle}
               connected={connected}
+              presence={presence}
+              currentUserId={userId}
               onSearchToggle={() => setSearching((v) => !v)}
               searching={searching}
               onBack={() => setSelectedId(null)}

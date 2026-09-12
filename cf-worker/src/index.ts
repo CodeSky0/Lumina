@@ -52,6 +52,17 @@ interface BackfillFrame {
   messages: ChatMessage[];
 }
 
+interface PresenceUser {
+  userId: string;
+  name: string;
+  role: "parent" | "teacher" | "classroom" | "admin";
+}
+
+interface PresenceFrame {
+  kind: "presence";
+  users: PresenceUser[];
+}
+
 const RECENT_LIMIT = 50;
 
 /* -------------------------------------------------------------------------- */
@@ -61,6 +72,8 @@ const RECENT_LIMIT = 50;
 export class RoomDO implements DurableObject {
   private readonly state: DurableObjectState;
   private readonly recent: ChatMessage[] = [];
+  private readonly presence = new Map<string, PresenceUser>();
+  private readonly wsToUserId = new Map<WebSocket, string>();
 
   constructor(state: DurableObjectState, _env: Env) {
     this.state = state;
@@ -144,6 +157,12 @@ export class RoomDO implements DurableObject {
     };
     server.send(JSON.stringify(hello));
 
+    const presenceFrame: PresenceFrame = {
+      kind: "presence",
+      users: [...this.presence.values()],
+    };
+    server.send(JSON.stringify(presenceFrame));
+
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -157,7 +176,19 @@ export class RoomDO implements DurableObject {
       return;
     }
     if (typeof frame !== "object" || frame === null) return;
-    const f = frame as { kind?: string; since?: string };
+    const f = frame as { kind?: string; since?: string; userId?: string; name?: string; role?: string };
+
+    if (f.kind === "join" && typeof f.userId === "string" && typeof f.name === "string" && typeof f.role === "string") {
+      const user: PresenceUser = {
+        userId: f.userId,
+        name: f.name,
+        role: f.role as PresenceUser["role"],
+      };
+      this.presence.set(user.userId, user);
+      this.wsToUserId.set(ws, user.userId);
+      this.broadcastPresence();
+      return;
+    }
 
     if (f.kind === "backfill" && typeof f.since === "string") {
       const missed = this.recent.filter((m) => m.createdAt > f.since!);
@@ -174,13 +205,33 @@ export class RoomDO implements DurableObject {
     }
   }
 
+  private broadcastPresence(): void {
+    const frame: PresenceFrame = {
+      kind: "presence",
+      users: [...this.presence.values()],
+    };
+    const data = JSON.stringify(frame);
+    for (const ws of this.state.getWebSockets()) {
+      try {
+        ws.send(data);
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   async webSocketClose(
-    _ws: WebSocket,
+    ws: WebSocket,
     _code: number,
     _reason: string,
     _wasClean: boolean,
   ): Promise<void> {
-    // Hibernatable API 自动管理连接，无需手动清理
+    const userId = this.wsToUserId.get(ws);
+    if (userId) {
+      this.presence.delete(userId);
+      this.wsToUserId.delete(ws);
+      this.broadcastPresence();
+    }
   }
 
   async webSocketError(_ws: WebSocket, _error: unknown): Promise<void> {
