@@ -49,7 +49,10 @@ export function ChatHeader({
             )}
             {connected && onlineCount > 0 && (
               <span className="flex items-center gap-1 text-label-12 text-success">
-                <span className="h-1.5 w-1.5 rounded-full bg-success" />
+                <span className="relative flex h-1.5 w-1.5 items-center justify-center">
+                  <span aria-hidden className="absolute inset-0 rounded-full bg-success/60 animate-pulse-ring" />
+                  <span className="relative h-1.5 w-1.5 rounded-full bg-success" />
+                </span>
                 {onlineCount} 人在线
               </span>
             )}
@@ -75,11 +78,16 @@ export function ChatHeader({
         )}
         {connected !== undefined && (
           <div className="flex items-center gap-1.5">
-            <span
-              className={`h-2 w-2 rounded-full transition-colors duration-slow ease-standard ${
-                connected ? "bg-success" : "bg-error animate-pulse"
-              }`}
-            />
+            <span className="relative flex h-2 w-2 items-center justify-center">
+              {connected && (
+                <span aria-hidden className="absolute inset-0 rounded-full bg-success/60 animate-pulse-ring" />
+              )}
+              <span
+                className={`relative h-2 w-2 rounded-full transition-colors duration-slow ease-standard ${
+                  connected ? "bg-success" : "bg-error animate-pulse"
+                }`}
+              />
+            </span>
             <span className="text-label-12 text-neutral-6">
               {connected ? "已连接" : "连接中"}
             </span>

@@ -248,9 +248,9 @@ export function MessageBubble({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+      initial={{ opacity: 0, y: 10, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.32, ease: [0.34, 1.56, 0.64, 1] }}
       className={`group flex ${isSelf ? "justify-end" : "justify-start"}`}
     >
       <div className={`max-w-[70%] ${isSelf ? "items-end" : "items-start"}`}>
@@ -270,7 +270,7 @@ export function MessageBubble({
           </div>
         )}
         <div
-          className={`rounded-xl px-3 py-2 ${
+          className={`relative rounded-xl px-3 py-2 ${
             isSelf
               ? "bg-accent text-white"
               : msg.type === "urgent"
@@ -278,6 +278,9 @@ export function MessageBubble({
                 : "bg-neutral-2 text-neutral-9 ring-1 ring-border"
           }`}
         >
+          {msg.type === "urgent" && !isSelf && (
+            <span aria-hidden className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-error animate-pulse-ring" />
+          )}
           {msg.type === "image" ? (
             <img
               src={msg.content}
