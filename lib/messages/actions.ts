@@ -3,7 +3,7 @@
 import { getCurrentSession } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db";
 import type { MessageType, MessageStatus, UserRole, ConversationType } from "@/lib/db/schema";
-import { and, desc, eq, or, inArray } from "drizzle-orm";
+import { and, desc, eq, or, inArray, gt, ne, sql } from "drizzle-orm";
 import { uploadImage } from "@/lib/images/upload";
 import {
   assertParentCanPostToClass,
@@ -11,7 +11,7 @@ import {
   getClassroomClassId,
   ForbiddenError,
 } from "@/lib/rbac";
-import { toPublishPayload } from "@/lib/realtime/contract";
+import { toPublishPayload, toDirectPublishPayload } from "@/lib/realtime/contract";
 import { publishMessage } from "@/lib/realtime/publish";
 import { z } from "zod";
 
@@ -23,6 +23,8 @@ export type ConversationItem = {
   title: string;
   subtitle: string;
   classId: string | null;
+  participantAId: string | null;
+  participantBId: string | null;
   lastMessagePreview: string | null;
   lastMessageAt: Date | null;
   unreadCount: number;
@@ -86,6 +88,8 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         title: c.className,
         subtitle: c.studentName ? `学生：${c.studentName}` : "",
         classId: c.classId,
+        participantAId: null,
+        participantBId: null,
         lastMessagePreview: lastMsg[0]
           ? lastMsg[0].type === "image"
             ? "[图片]"
@@ -168,6 +172,8 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         title: t.teacherName,
         subtitle: `${t.className} 教师`,
         classId: null,
+        participantAId: t.teacherId,
+        participantBId: user.id,
         lastMessagePreview: lastMsg[0]
           ? lastMsg[0].type === "image"
             ? "[图片]"
@@ -229,6 +235,8 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         title: c.className,
         subtitle: "班级群",
         classId: c.classId,
+        participantAId: null,
+        participantBId: null,
         lastMessagePreview: lastMsg[0]
           ? lastMsg[0].type === "image"
             ? "[图片]"
@@ -322,6 +330,8 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         title: p.parentName,
         subtitle: `学生：${studentNames}`,
         classId: null,
+        participantAId: user.id,
+        participantBId: p.parentId,
         lastMessagePreview: lastMsg[0]
           ? lastMsg[0].type === "image"
             ? "[图片]"
@@ -381,6 +391,8 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         title: classInfo[0]?.name ?? "班级群",
         subtitle: "教室大屏",
         classId,
+        participantAId: null,
+        participantBId: null,
         lastMessagePreview: lastMsg[0]
           ? lastMsg[0].type === "image"
             ? "[图片]"
@@ -391,6 +403,41 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         lastMessageAt: lastMsg[0]?.createdAt ?? null,
         unreadCount: 0,
       });
+    }
+  }
+
+  if (items.length > 0) {
+    const conversationIds = items.map((i) => i.conversationId);
+
+    const reads = await db
+      .select({
+        conversationId: schema.messageReads.conversationId,
+        lastReadAt: schema.messageReads.lastReadAt,
+      })
+      .from(schema.messageReads)
+      .where(
+        and(
+          eq(schema.messageReads.userId, user.id),
+          inArray(schema.messageReads.conversationId, conversationIds),
+        ),
+      );
+
+    const readMap = new Map(reads.map((r) => [r.conversationId, r.lastReadAt]));
+
+    for (const item of items) {
+      const lastReadAt = readMap.get(item.conversationId);
+      const conditions = [
+        eq(schema.messages.conversationId, item.conversationId),
+        ne(schema.messages.senderId, user.id),
+      ];
+      if (lastReadAt) {
+        conditions.push(gt(schema.messages.createdAt, lastReadAt));
+      }
+      const count = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.messages)
+        .where(and(...conditions));
+      item.unreadCount = count[0]?.count ?? 0;
     }
   }
 
@@ -482,19 +529,38 @@ export async function sendMessage(
       content,
       type,
       mimeType,
-      status: "pending",
+      status: "delivered",
     })
     .returning();
   if (!msg) return { ok: false, error: "消息写入失败" };
 
-  const classId = conversation.classId;
-  if (classId) {
+  if (conversation.type === "group" && conversation.classId) {
     await publishMessage(
       toPublishPayload({
-        classId,
+        classId: conversation.classId,
         messageId: msg.id,
         senderName: user.name,
         senderId: user.id,
+        senderRole: user.role,
+        type,
+        content,
+        mimeType,
+        createdAt: msg.createdAt,
+      }),
+    );
+  } else if (
+    conversation.type === "direct" &&
+    conversation.participantAId &&
+    conversation.participantBId
+  ) {
+    await publishMessage(
+      toDirectPublishPayload({
+        userAId: conversation.participantAId,
+        userBId: conversation.participantBId,
+        messageId: msg.id,
+        senderName: user.name,
+        senderId: user.id,
+        senderRole: user.role,
         type,
         content,
         mimeType,
@@ -503,7 +569,7 @@ export async function sendMessage(
     );
   }
 
-  return { ok: true, id: msg.id, status: "pending" };
+  return { ok: true, id: msg.id, status: "delivered" };
 }
 
 /* ------------------------------ 查询消息 ------------------------------ */
@@ -541,6 +607,17 @@ export async function getConversationMessages(
     return [];
   }
 
+  await db
+    .update(schema.messages)
+    .set({ status: "displayed" })
+    .where(
+      and(
+        eq(schema.messages.conversationId, conversationId),
+        ne(schema.messages.senderId, user.id),
+        eq(schema.messages.status, "delivered"),
+      ),
+    );
+
   const rows = await db
     .select({
       id: schema.messages.id,
@@ -559,6 +636,49 @@ export async function getConversationMessages(
     .orderBy(desc(schema.messages.createdAt))
     .limit(100);
   return rows;
+}
+
+/* ------------------------------ 已读标记 ------------------------------ */
+
+export async function markConversationRead(
+  conversationId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await getCurrentSession();
+  if (!session) return { ok: false, error: "未登录" };
+  const user = session.user;
+
+  const conv = await db
+    .select()
+    .from(schema.conversations)
+    .where(eq(schema.conversations.id, conversationId))
+    .limit(1);
+  if (conv.length === 0) return { ok: false, error: "会话不存在" };
+
+  try {
+    await assertCanAccessConversation(user.id, user.role, conv[0]!);
+  } catch (err) {
+    if (err instanceof ForbiddenError) {
+      return { ok: false, error: err.message };
+    }
+    return { ok: false, error: "权限校验失败" };
+  }
+
+  await db
+    .insert(schema.messageReads)
+    .values({
+      userId: user.id,
+      conversationId,
+      lastReadAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [schema.messageReads.userId, schema.messageReads.conversationId],
+      set: {
+        lastReadAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+
+  return { ok: true };
 }
 
 /* ------------------------------ 权限校验 ------------------------------ */

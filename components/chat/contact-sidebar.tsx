@@ -149,6 +149,11 @@ function ContactItem({
           <span className="truncate text-copy-13 text-neutral-6">
             {item.lastMessagePreview ?? item.subtitle}
           </span>
+          {item.unreadCount > 0 && (
+            <span className="ml-1 shrink-0 rounded-full bg-error px-1.5 py-0.5 text-caption-10 font-medium text-white">
+              {item.unreadCount > 99 ? "99+" : item.unreadCount}
+            </span>
+          )}
         </div>
       </div>
     </button>

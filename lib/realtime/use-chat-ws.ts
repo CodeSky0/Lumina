@@ -19,6 +19,8 @@ export function useChatWs(wsUrl: string | null): {
   const lastCreatedAt = useRef<string | null>(null);
 
   useEffect(() => {
+    setMessages([]);
+    lastCreatedAt.current = null;
     if (!wsUrl) return;
     let closed = false;
     let timer: ReturnType<typeof setTimeout> | null = null;

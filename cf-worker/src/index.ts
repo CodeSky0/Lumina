@@ -23,6 +23,7 @@ interface PublishPayload {
   messageId: string;
   senderName: string;
   senderId: string;
+  senderRole: "parent" | "teacher" | "classroom" | "admin";
   type: "text" | "image" | "urgent";
   content: string;
   mimeType: string | null;
@@ -34,6 +35,7 @@ interface ChatMessage {
   messageId: string;
   senderName: string;
   senderId: string;
+  senderRole: "parent" | "teacher" | "classroom" | "admin";
   type: "text" | "image" | "urgent";
   content: string;
   mimeType: string | null;
@@ -104,6 +106,7 @@ export class RoomDO implements DurableObject {
       messageId: payload.messageId,
       senderName: payload.senderName,
       senderId: payload.senderId,
+      senderRole: payload.senderRole,
       type: payload.type,
       content: payload.content,
       mimeType: payload.mimeType,

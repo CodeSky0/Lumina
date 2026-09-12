@@ -9,7 +9,7 @@
  *   私信: dm-{sortedUserAId}-{sortedUserBId}
  */
 import { z } from "zod";
-import type { MessageType } from "@/lib/db/schema";
+import type { MessageType, UserRole } from "@/lib/db/schema";
 
 /** 班级群聊房间名 */
 export function roomNameForClass(classId: string): string {
@@ -29,6 +29,7 @@ export const publishPayloadSchema = z.object({
   messageId: z.uuid(),
   senderName: z.string(),
   senderId: z.string(),
+  senderRole: z.enum(["parent", "teacher", "classroom", "admin"]),
   type: z.enum(["text", "image", "urgent"]),
   content: z.string(),
   mimeType: z.string().nullable(),
@@ -44,6 +45,7 @@ export const chatMessageSchema = z.object({
   messageId: z.uuid(),
   senderName: z.string(),
   senderId: z.string(),
+  senderRole: z.enum(["parent", "teacher", "classroom", "admin"]),
   type: z.enum(["text", "image", "urgent"]),
   content: z.string(),
   mimeType: z.string().nullable(),
@@ -77,6 +79,7 @@ export function toPublishPayload(input: {
   messageId: string;
   senderName: string;
   senderId: string;
+  senderRole: UserRole;
   type: MessageType;
   content: string;
   mimeType: string | null;
@@ -87,6 +90,7 @@ export function toPublishPayload(input: {
     messageId: input.messageId,
     senderName: input.senderName,
     senderId: input.senderId,
+    senderRole: input.senderRole,
     type: input.type,
     content: input.content,
     mimeType: input.mimeType,
@@ -101,6 +105,7 @@ export function toDirectPublishPayload(input: {
   messageId: string;
   senderName: string;
   senderId: string;
+  senderRole: UserRole;
   type: MessageType;
   content: string;
   mimeType: string | null;
@@ -111,6 +116,7 @@ export function toDirectPublishPayload(input: {
     messageId: input.messageId,
     senderName: input.senderName,
     senderId: input.senderId,
+    senderRole: input.senderRole,
     type: input.type,
     content: input.content,
     mimeType: input.mimeType,

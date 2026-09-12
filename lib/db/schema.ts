@@ -367,6 +367,43 @@ export const messagesRelations = relations(messages, ({ one }) => ({
 }));
 
 /* -------------------------------------------------------------------------- */
+/* message_reads — 用户 × 会话 的已读位置（未读计数支持）                       */
+/* -------------------------------------------------------------------------- */
+
+export const messageReads = pgTable(
+  "message_reads",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    lastReadAt: timestamp("last_read_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.conversationId] })],
+);
+
+export const messageReadsRelations = relations(messageReads, ({ one }) => ({
+  user: one(users, {
+    fields: [messageReads.userId],
+    references: [users.id],
+  }),
+  conversation: one(conversations, {
+    fields: [messageReads.conversationId],
+    references: [conversations.id],
+  }),
+}));
+
+/* -------------------------------------------------------------------------- */
 /* 派生类型导出                                                                */
 /* -------------------------------------------------------------------------- */
 

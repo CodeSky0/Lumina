@@ -10,11 +10,12 @@ import {
 import {
   getMyConversations,
   getConversationMessages,
+  markConversationRead,
   type ConversationItem,
   type ClassMessage,
 } from "@/lib/messages/actions";
 import { useChatWs } from "@/lib/realtime/use-chat-ws";
-import { roomNameForClass } from "@/lib/realtime/contract";
+import { roomNameForClass, roomNameForDirect } from "@/lib/realtime/contract";
 
 export function ChatLayout({
   userName,
@@ -43,43 +44,92 @@ export function ChatLayout({
 
   const selected = conversations.find((c) => c.conversationId === selectedId);
 
+  function handleSelectConversation(id: string) {
+    setSelectedId(id);
+    void markConversationRead(id).then(() => {
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.conversationId === id ? { ...c, unreadCount: 0 } : c,
+        ),
+      );
+    });
+  }
+
   const wsUrl =
     selected && cfWorkerUrl
       ? selected.type === "group" && selected.classId
         ? `${cfWorkerUrl.replace(/\/$/, "").replace(/^http/, "ws")}/ws/${roomNameForClass(selected.classId)}`
-        : `${cfWorkerUrl.replace(/\/$/, "").replace(/^http/, "ws")}/ws/dm-placeholder`
+        : selected.type === "direct" && selected.participantAId && selected.participantBId
+          ? `${cfWorkerUrl.replace(/\/$/, "").replace(/^http/, "ws")}/ws/${roomNameForDirect(selected.participantAId, selected.participantBId)}`
+          : null
       : null;
 
-  const { connected } = useChatWs(wsUrl);
+  const { messages: wsMessages, connected } = useChatWs(wsUrl);
 
   useEffect(() => {
     if (!selectedId) return;
     let active = true;
-    void getConversationMessages(selectedId).then((msgs) => {
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+    async function loadLatest() {
+      const msgs = await getConversationMessages(selectedId!);
       if (active) {
         setMessages(msgs);
         if (msgs.length > 0) {
           setCurrentUserId(msgs[0]!.senderId);
         }
       }
-    });
-    const t = setInterval(() => {
-      void getConversationMessages(selectedId).then((msgs) => {
-        if (active) setMessages(msgs);
-      });
-    }, 3000);
+    }
+
+    void loadLatest();
+
+    if (!connected) {
+      pollTimer = setInterval(() => {
+        if (document.hidden) return;
+        void loadLatest();
+      }, 5000);
+    }
+
+    function onVisibilityChange() {
+      if (!document.hidden && !connected) void loadLatest();
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     return () => {
       active = false;
-      clearInterval(t);
+      if (pollTimer) clearInterval(pollTimer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [selectedId]);
+  }, [selectedId, connected]);
+
+  useEffect(() => {
+    if (wsMessages.length === 0) return;
+    setMessages((prev) => {
+      const existingIds = new Set(prev.map((m) => m.id));
+      const newMsgs = wsMessages
+        .filter((m) => !existingIds.has(m.messageId))
+        .map((m): ClassMessage => ({
+          id: m.messageId,
+          senderName: m.senderName,
+          senderRole: m.senderRole,
+          senderId: m.senderId,
+          content: m.content,
+          type: m.type,
+          mimeType: m.mimeType,
+          status: "displayed",
+          createdAt: new Date(m.createdAt),
+        }));
+      if (newMsgs.length === 0) return prev;
+      return [...prev, ...newMsgs];
+    });
+  }, [wsMessages]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-neutral-1">
       <ContactSidebar
         conversations={conversations}
         selectedId={selectedId}
-        onSelect={setSelectedId}
+        onSelect={handleSelectConversation}
         userName={userName}
         userRole={userRole}
       />
