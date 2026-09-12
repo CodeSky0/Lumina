@@ -562,6 +562,38 @@ export const announcementsRelations = relations(announcements, ({ one }) => ({
 }));
 
 /* -------------------------------------------------------------------------- */
+/* audit_logs — 操作审计日志                                                   */
+/* -------------------------------------------------------------------------- */
+
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    action: text("action").notNull(),
+    targetType: text("target_type").notNull(),
+    targetId: text("target_id"),
+    detail: jsonb("detail"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("audit_logs_user_idx").on(t.userId),
+    index("audit_logs_created_at_idx").on(t.createdAt),
+  ],
+);
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [auditLogs.userId],
+    references: [users.id],
+  }),
+}));
+
+/* -------------------------------------------------------------------------- */
 /* 派生类型导出                                                                */
 /* -------------------------------------------------------------------------- */
 

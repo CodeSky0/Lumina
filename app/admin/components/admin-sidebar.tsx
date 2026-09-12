@@ -1,11 +1,13 @@
 "use client";
 
-export type AdminTab = "users" | "classes" | "bindings";
+export type AdminTab = "dashboard" | "users" | "classes" | "bindings" | "audit";
 
 const TAB_LABELS: Record<AdminTab, string> = {
+  dashboard: "仪表盘",
   users: "用户管理",
   classes: "班级管理",
   bindings: "绑定关系",
+  audit: "审计日志",
 };
 
 interface AdminSidebarProps {

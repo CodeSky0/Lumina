@@ -13,6 +13,7 @@ import { and, eq } from "drizzle-orm";
 import { createHash, randomBytes } from "node:crypto";
 import { headers } from "next/headers";
 import { z } from "zod";
+import { writeAuditLog } from "@/lib/admin/audit";
 
 /* ------------------------------ 工具 ------------------------------ */
 
@@ -75,7 +76,7 @@ export type CreatedUser = {
 export async function createUser(
   input: z.infer<typeof createUserSchema>,
 ): Promise<CreatedUser> {
-  await requireUser("admin");
+  const admin = await requireUser("admin");
   const { role, name } = createUserSchema.parse(input);
 
   const username = await generateUniqueUsername(role);
@@ -97,6 +98,8 @@ export async function createUser(
     .update(schema.users)
     .set({ role, tokenHash: sha256(token) })
     .where(eq(schema.users.id, userId));
+
+  await writeAuditLog({ userId: admin.id, action: "create", targetType: "user", targetId: userId, detail: { role, name, username } });
 
   return { id: userId, username, token, name, role };
 }
@@ -130,6 +133,7 @@ export async function deleteUser(userId: string): Promise<void> {
     throw new Error("不能删除自己的账户");
   }
   await db.delete(schema.users).where(eq(schema.users.id, userId));
+  await writeAuditLog({ userId: currentUser.id, action: "delete", targetType: "user", targetId: userId });
 }
 
 export type ResetTokenResult = {
@@ -142,7 +146,7 @@ export type ResetTokenResult = {
 
 /** 重置用户 Token：生成新 Token，更新密码哈希与 tokenHash，返回明文（仅此次返回） */
 export async function resetUserToken(userId: string): Promise<ResetTokenResult> {
-  await requireUser("admin");
+  const admin = await requireUser("admin");
 
   const [user] = await db
     .select({
@@ -168,6 +172,8 @@ export async function resetUserToken(userId: string): Promise<ResetTokenResult> 
     .update(schema.users)
     .set({ tokenHash: sha256(newToken) })
     .where(eq(schema.users.id, userId));
+
+  await writeAuditLog({ userId: admin.id, action: "reset_token", targetType: "user", targetId: userId });
 
   return {
     id: user.id,
@@ -375,13 +381,14 @@ const createClassSchema = z.object({ name: z.string().min(1).max(50) });
 export async function createClass(
   input: z.infer<typeof createClassSchema>,
 ): Promise<{ id: string; name: string }> {
-  await requireUser("admin");
+  const admin = await requireUser("admin");
   const { name } = createClassSchema.parse(input);
   const [row] = await db
     .insert(schema.classes)
     .values({ name })
     .returning({ id: schema.classes.id, name: schema.classes.name });
   if (!row) throw new Error("创建班级失败");
+  await writeAuditLog({ userId: admin.id, action: "create", targetType: "class", targetId: row.id, detail: { name } });
   return row;
 }
 
@@ -437,8 +444,9 @@ export async function listClasses(): Promise<ClassListItem[]> {
 }
 
 export async function deleteClass(classId: string): Promise<void> {
-  await requireUser("admin");
+  const admin = await requireUser("admin");
   await db.delete(schema.classes).where(eq(schema.classes.id, classId));
+  await writeAuditLog({ userId: admin.id, action: "delete", targetType: "class", targetId: classId });
 }
 
 /* ------------------------------ 绑定：教师↔班级 ------------------------------ */

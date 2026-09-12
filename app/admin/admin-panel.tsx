@@ -15,16 +15,18 @@ import {
 } from "@/lib/admin/actions";
 import { ToastProvider } from "@/components/ui";
 import { AdminSidebar, type AdminTab } from "./components/admin-sidebar";
+import { DashboardTab } from "./tabs/dashboard-tab";
 import { UsersTab } from "./tabs/users-tab";
 import { ClassesTab } from "./tabs/classes-tab";
 import { BindingsTab } from "./tabs/bindings-tab";
+import { AuditTab } from "./tabs/audit-tab";
 
 interface AdminPanelProps {
   adminName: string;
 }
 
 export default function AdminPanel({ adminName }: AdminPanelProps) {
-  const [activeTab, setActiveTab] = useState<AdminTab>("users");
+  const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [classes, setClasses] = useState<ClassListItem[]>([]);
   const [teacherBindings, setTeacherBindings] = useState<TeacherClassBinding[]>(
@@ -69,6 +71,7 @@ export default function AdminPanel({ adminName }: AdminPanelProps) {
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
             >
+              {activeTab === "dashboard" && <DashboardTab />}
               {activeTab === "users" && (
                 <UsersTab users={users} classes={classes} onRefresh={refresh} />
               )}
@@ -84,6 +87,7 @@ export default function AdminPanel({ adminName }: AdminPanelProps) {
                   onRefresh={refresh}
                 />
               )}
+              {activeTab === "audit" && <AuditTab />}
             </motion.div>
           </AnimatePresence>
         </main>
