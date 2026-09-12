@@ -40,7 +40,7 @@ export function ContactSidebar({
   const directConvs = conversations.filter((c) => c.type === "direct");
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-neutral-1">
+    <aside className="flex w-full shrink-0 flex-col border-r border-border bg-neutral-1 md:w-64">
       <div className="border-b border-border px-4 py-3">
         <h1 className="font-serif text-title-24 font-medium text-neutral-10">
           Lumina

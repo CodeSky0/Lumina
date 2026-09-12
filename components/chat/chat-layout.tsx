@@ -132,15 +132,17 @@ export function ChatLayout({
 
   return (
     <div className="flex h-screen overflow-hidden bg-neutral-1">
-      <ContactSidebar
-        conversations={conversations}
-        selectedId={selectedId}
-        onSelect={handleSelectConversation}
-        userName={userName}
-        userRole={userRole}
-      />
+      <div className={`${selectedId ? "hidden md:block" : "block"} w-full md:w-auto`}>
+        <ContactSidebar
+          conversations={conversations}
+          selectedId={selectedId}
+          onSelect={handleSelectConversation}
+          userName={userName}
+          userRole={userRole}
+        />
+      </div>
 
-      <main className="flex flex-1 flex-col">
+      <main className={`${selectedId ? "flex" : "hidden md:flex"} flex-1 flex-col`}>
         {selected ? (
           <>
             <ChatHeader
@@ -149,6 +151,7 @@ export function ChatLayout({
               connected={connected}
               onSearchToggle={() => setSearching((v) => !v)}
               searching={searching}
+              onBack={() => setSelectedId(null)}
             />
             <AnimatePresence>
               {searching && (

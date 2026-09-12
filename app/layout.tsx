@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ServiceWorkerRegister } from "@/components/sw-register";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Lumina 流光",
   description: "极简实时家校沟通平台",
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({
@@ -18,6 +20,7 @@ export default function RootLayout({
       <body className="min-h-screen antialiased">
         <ThemeProvider>
           {children}
+          <ServiceWorkerRegister />
           <SpeedInsights />
         </ThemeProvider>
       </body>

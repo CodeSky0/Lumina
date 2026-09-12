@@ -6,16 +6,30 @@ export function ChatHeader({
   connected,
   onSearchToggle,
   searching,
+  onBack,
 }: {
   title: string;
   subtitle?: string;
   connected?: boolean;
   onSearchToggle?: () => void;
   searching?: boolean;
+  onBack?: () => void;
 }) {
   return (
     <div className="flex items-center justify-between border-b border-border px-4 py-3">
       <div className="flex items-center gap-2">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="mr-1 flex h-8 w-8 items-center justify-center rounded-lg text-neutral-7 hover:bg-neutral-2 md:hidden"
+            aria-label="返回"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m12 19-7-7 7-7" />
+              <path d="M19 12H5" />
+            </svg>
+          </button>
+        )}
         <h2 className="font-serif text-title-20 font-medium text-neutral-10">
           {title}
         </h2>
