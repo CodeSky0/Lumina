@@ -15,9 +15,10 @@ const ROLE_LABELS: Record<string, string> = {
 interface TokenDisplayProps {
   created: CreatedUser | null;
   onClose: () => void;
+  mode?: "create" | "reset";
 }
 
-export function TokenDisplay({ created, onClose }: TokenDisplayProps) {
+export function TokenDisplay({ created, onClose, mode = "create" }: TokenDisplayProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   function copy(text: string, field: string) {
@@ -26,12 +27,17 @@ export function TokenDisplay({ created, onClose }: TokenDisplayProps) {
     setTimeout(() => setCopiedField(null), 2000);
   }
 
+  const title = mode === "reset" ? "Token 已重置" : "用户创建成功";
+  const warning = mode === "reset"
+    ? "新 Token 仅显示一次，请立即保存！旧 Token 已失效。"
+    : "Token 仅显示一次，请立即保存！";
+
   return (
-    <Dialog open={!!created} onClose={onClose} title="用户创建成功" className="max-w-lg">
+    <Dialog open={!!created} onClose={onClose} title={title} className="max-w-lg">
       {created && (
         <div className="space-y-4">
           <div className="rounded-md bg-success/10 p-3 text-copy-14 text-success ring-1 ring-success/30">
-            Token 仅显示一次，请立即保存！
+            {warning}
           </div>
 
           <div className="space-y-3">

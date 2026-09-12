@@ -13,12 +13,16 @@ import {
 import {
   createUser,
   deleteUser,
+  resetUserToken,
+  type BatchResultItem,
   type ClassListItem,
   type CreatedUser,
   type UserListItem,
 } from "@/lib/admin/actions";
 import { TokenDisplay } from "../components/token-display";
 import { ConfirmDialog } from "../components/confirm-dialog";
+import { BatchImportDialog } from "../components/batch-import-dialog";
+import { BatchResultDialog } from "../components/batch-result-dialog";
 
 const ROLE_LABELS: Record<string, string> = {
   parent: "家长",
@@ -46,7 +50,11 @@ export function UsersTab({ users, onRefresh }: UsersTabProps) {
   const [roleFilter, setRoleFilter] = useState<string>("");
   const [showCreate, setShowCreate] = useState(false);
   const [created, setCreated] = useState<CreatedUser | null>(null);
+  const [tokenMode, setTokenMode] = useState<"create" | "reset">("create");
   const [deleteTarget, setDeleteTarget] = useState<UserListItem | null>(null);
+  const [showBatchImport, setShowBatchImport] = useState(false);
+  const [batchMode, setBatchMode] = useState<"teacher" | "student">("teacher");
+  const [batchResults, setBatchResults] = useState<BatchResultItem[] | null>(null);
   const { show } = useToast();
 
   const filtered = useMemo(() => {
@@ -70,6 +78,7 @@ export function UsersTab({ users, onRefresh }: UsersTabProps) {
           name: String(f.get("name")),
         });
         setCreated(res);
+        setTokenMode("create");
         setShowCreate(false);
         await onRefresh();
         show("success", "用户创建成功");
@@ -93,13 +102,46 @@ export function UsersTab({ users, onRefresh }: UsersTabProps) {
     });
   }
 
+  function handleResetToken(user: UserListItem) {
+    startTransition(async () => {
+      try {
+        const res = await resetUserToken(user.id);
+        setTokenMode("reset");
+        setCreated(res);
+        show("success", "Token 已重置");
+      } catch (e) {
+        show("error", e instanceof Error ? e.message : "重置失败");
+      }
+    });
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="font-serif text-title-20 font-medium text-neutral-10">
           用户管理（{users.length}）
         </h2>
-        <Button onClick={() => setShowCreate(true)}>创建用户</Button>
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setBatchMode("teacher");
+              setShowBatchImport(true);
+            }}
+          >
+            批量导入教师
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setBatchMode("student");
+              setShowBatchImport(true);
+            }}
+          >
+            批量导入学生
+          </Button>
+          <Button onClick={() => setShowCreate(true)}>创建用户</Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -163,13 +205,22 @@ export function UsersTab({ users, onRefresh }: UsersTabProps) {
                     {u.createdAt.toLocaleDateString("zh-CN")}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      onClick={() => setDeleteTarget(u)}
-                    >
-                      删除
-                    </Button>
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleResetToken(u)}
+                      >
+                        重置Token
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => setDeleteTarget(u)}
+                      >
+                        删除
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -204,7 +255,7 @@ export function UsersTab({ users, onRefresh }: UsersTabProps) {
         </form>
       </Dialog>
 
-      <TokenDisplay created={created} onClose={() => setCreated(null)} />
+      <TokenDisplay created={created} onClose={() => setCreated(null)} mode={tokenMode} />
 
       <ConfirmDialog
         open={!!deleteTarget}
@@ -213,6 +264,22 @@ export function UsersTab({ users, onRefresh }: UsersTabProps) {
         confirmLabel="删除"
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <BatchImportDialog
+        open={showBatchImport}
+        mode={batchMode}
+        onClose={() => setShowBatchImport(false)}
+        onComplete={(results) => {
+          setShowBatchImport(false);
+          setBatchResults(results);
+          onRefresh();
+        }}
+      />
+
+      <BatchResultDialog
+        results={batchResults}
+        onClose={() => setBatchResults(null)}
       />
     </div>
   );

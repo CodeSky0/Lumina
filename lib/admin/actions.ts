@@ -4,19 +4,52 @@
  * Admin CRUD Server Actions — 创建用户/生成凭证、班级、绑定关系、列表查询。
  * 全部强制 requireUser("admin")，非管理员调用抛 403。
  */
+import { hashPassword } from "@better-auth/utils/password";
 import { auth } from "@/lib/auth/server";
 import { requireUser } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db";
 import type { UserRole } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { headers } from "next/headers";
 import { z } from "zod";
 
 /* ------------------------------ 工具 ------------------------------ */
 
+const ROLE_PREFIX: Record<UserRole, string> = {
+  parent: "P",
+  teacher: "T",
+  classroom: "C",
+  admin: "A",
+};
+
+const SHORT_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+
+function generateShortCode(length = 6): string {
+  const bytes = randomBytes(length);
+  let code = "";
+  for (let i = 0; i < length; i++) {
+    code += SHORT_CODE_CHARS[bytes[i]! % SHORT_CODE_CHARS.length]!;
+  }
+  return code;
+}
+
+async function generateUniqueUsername(role: UserRole): Promise<string> {
+  const prefix = ROLE_PREFIX[role];
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const username = `${prefix}-${generateShortCode()}`;
+    const existing = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.username, username))
+      .limit(1);
+    if (existing.length === 0) return username;
+  }
+  throw new Error("生成唯一 ID 失败，请重试");
+}
+
 function generateToken(): string {
-  return randomBytes(24).toString("hex");
+  return randomBytes(12).toString("base64url");
 }
 
 function sha256(s: string): string {
@@ -45,7 +78,7 @@ export async function createUser(
   await requireUser("admin");
   const { role, name } = createUserSchema.parse(input);
 
-  const username = randomUUID();
+  const username = await generateUniqueUsername(role);
   const token = generateToken();
 
   const res = await auth.api.signUpEmail({
@@ -97,6 +130,242 @@ export async function deleteUser(userId: string): Promise<void> {
     throw new Error("不能删除自己的账户");
   }
   await db.delete(schema.users).where(eq(schema.users.id, userId));
+}
+
+export type ResetTokenResult = {
+  id: string;
+  username: string;
+  token: string;
+  name: string;
+  role: UserRole;
+};
+
+/** 重置用户 Token：生成新 Token，更新密码哈希与 tokenHash，返回明文（仅此次返回） */
+export async function resetUserToken(userId: string): Promise<ResetTokenResult> {
+  await requireUser("admin");
+
+  const [user] = await db
+    .select({
+      id: schema.users.id,
+      username: schema.users.username,
+      name: schema.users.name,
+      role: schema.users.role,
+    })
+    .from(schema.users)
+    .where(eq(schema.users.id, userId))
+    .limit(1);
+  if (!user) throw new Error("用户不存在");
+
+  const newToken = generateToken();
+  const hashedPassword = await hashPassword(newToken);
+
+  await db
+    .update(schema.accounts)
+    .set({ password: hashedPassword })
+    .where(eq(schema.accounts.userId, userId));
+
+  await db
+    .update(schema.users)
+    .set({ tokenHash: sha256(newToken) })
+    .where(eq(schema.users.id, userId));
+
+  return {
+    id: user.id,
+    username: user.username,
+    token: newToken,
+    name: user.name,
+    role: user.role,
+  };
+}
+
+/* ------------------------------ 批量导入 ------------------------------ */
+
+export type BatchResultItem = {
+  name: string;
+  role: UserRole;
+  username: string;
+  token: string;
+  className?: string;
+  studentName?: string;
+  error?: string;
+};
+
+const batchTeacherSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(50),
+        className: z.string().optional(),
+      }),
+    )
+    .min(1)
+    .max(500),
+});
+
+/** 批量创建教师，可选绑定班级 */
+export async function batchCreateTeachers(
+  input: z.infer<typeof batchTeacherSchema>,
+): Promise<BatchResultItem[]> {
+  await requireUser("admin");
+  const { items } = batchTeacherSchema.parse(input);
+
+  const allClasses = await db
+    .select({ id: schema.classes.id, name: schema.classes.name })
+    .from(schema.classes);
+  const classMap = new Map(allClasses.map((c) => [c.name, c.id]));
+
+  const results: BatchResultItem[] = [];
+  for (const item of items) {
+    try {
+      const username = await generateUniqueUsername("teacher");
+      const token = generateToken();
+      const res = await auth.api.signUpEmail({
+        body: {
+          email: `${username}@lumina.local`,
+          name: item.name,
+          password: token,
+          username,
+        },
+        headers: await headers(),
+      });
+      if (!res?.user) throw new Error("创建失败");
+      const userId = res.user.id;
+
+      await db
+        .update(schema.users)
+        .set({ role: "teacher", tokenHash: sha256(token) })
+        .where(eq(schema.users.id, userId));
+
+      if (item.className) {
+        const classId = classMap.get(item.className);
+        if (classId) {
+          await db
+            .insert(schema.teacherClasses)
+            .values({ teacherId: userId, classId })
+            .onConflictDoNothing();
+        }
+      }
+
+      results.push({
+        name: item.name,
+        role: "teacher",
+        username,
+        token,
+        className: item.className,
+      });
+    } catch (e) {
+      results.push({
+        name: item.name,
+        role: "teacher",
+        username: "",
+        token: "",
+        className: item.className,
+        error: e instanceof Error ? e.message : "创建失败",
+      });
+    }
+  }
+  return results;
+}
+
+const batchStudentSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        studentName: z.string().min(1).max(50),
+        parentName: z.string().min(1).max(50),
+        className: z.string().min(1),
+      }),
+    )
+    .min(1)
+    .max(500),
+});
+
+/** 批量创建学生/家长：同一家长姓名只创建一个用户，多个孩子绑定到同一账号 */
+export async function batchCreateStudents(
+  input: z.infer<typeof batchStudentSchema>,
+): Promise<BatchResultItem[]> {
+  await requireUser("admin");
+  const { items } = batchStudentSchema.parse(input);
+
+  const allClasses = await db
+    .select({ id: schema.classes.id, name: schema.classes.name })
+    .from(schema.classes);
+  const classMap = new Map(allClasses.map((c) => [c.name, c.id]));
+
+  const parentCache = new Map<string, { id: string; username: string; token: string }>();
+  const results: BatchResultItem[] = [];
+
+  for (const item of items) {
+    try {
+      const classId = classMap.get(item.className);
+      if (!classId) {
+        results.push({
+          name: item.parentName,
+          role: "parent",
+          username: "",
+          token: "",
+          className: item.className,
+          studentName: item.studentName,
+          error: `班级"${item.className}"不存在`,
+        });
+        continue;
+      }
+
+      let parent = parentCache.get(item.parentName);
+      if (!parent) {
+        const username = await generateUniqueUsername("parent");
+        const token = generateToken();
+        const res = await auth.api.signUpEmail({
+          body: {
+            email: `${username}@lumina.local`,
+            name: item.parentName,
+            password: token,
+            username,
+          },
+          headers: await headers(),
+        });
+        if (!res?.user) throw new Error("创建家长失败");
+        const userId = res.user.id;
+
+        await db
+          .update(schema.users)
+          .set({ role: "parent", tokenHash: sha256(token) })
+          .where(eq(schema.users.id, userId));
+
+        parent = { id: userId, username, token };
+        parentCache.set(item.parentName, parent);
+      }
+
+      await db
+        .insert(schema.parentStudents)
+        .values({
+          parentId: parent.id,
+          classId,
+          studentName: item.studentName,
+        })
+        .onConflictDoNothing();
+
+      results.push({
+        name: item.parentName,
+        role: "parent",
+        username: parent.username,
+        token: parent.token,
+        className: item.className,
+        studentName: item.studentName,
+      });
+    } catch (e) {
+      results.push({
+        name: item.parentName,
+        role: "parent",
+        username: "",
+        token: "",
+        className: item.className,
+        studentName: item.studentName,
+        error: e instanceof Error ? e.message : "创建失败",
+      });
+    }
+  }
+  return results;
 }
 
 /* ------------------------------ 班级 ------------------------------ */
@@ -356,7 +625,7 @@ export async function createFirstAdmin(
 ): Promise<CreateFirstAdminResult> {
   if (await hasAdmin()) return { ok: false, error: "管理员已存在" };
   const { name, token } = createFirstAdminSchema.parse(input);
-  const username = randomUUID();
+  const username = await generateUniqueUsername("admin");
   const res = await auth.api.signUpEmail({
     body: {
       email: `${username}@lumina.local`,

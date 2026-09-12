@@ -2,7 +2,7 @@
  * Better-Auth 服务端实例。
  *
  * 认证方案：username + password（ID → username，Token → password）
- *   - username plugin 允许 UUID 字符（含 hyphen），禁用归一化保留原样
+ *   - username plugin 允许短码字符（字母数字与连字符），禁用归一化保留原样
  *   - users 表复用为 better-auth user 表（usePlural 映射）
  *   - role / tokenHash 作为 additionalFields（input:false，由服务端逻辑写入）
  */
@@ -32,11 +32,11 @@ export const auth = betterAuth({
   },
   plugins: [
     username({
-      /** 允许 UUID 字符：字母数字与连字符 */
+      /** 允许短码字符：字母数字与连字符 */
       usernameValidator: (u) => /^[a-zA-Z0-9-]+$/.test(u),
-      /** 禁用归一化，保留 UUID 原样 */
+      /** 禁用归一化，保留原样 */
       usernameNormalization: false,
-      /** UUID 36 字符，默认 30 不够 */
+      /** 短码最长 10 字符（前缀+6位），默认 30 足够 */
       maxUsernameLength: 100,
     }),
   ],

@@ -73,7 +73,7 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-  /** username plugin：登录 ID（UUID 字符串） */
+  /** username plugin：登录 ID（角色前缀+6位短码，如 T-A3X9K2） */
   username: text("username").notNull().unique(),
   displayUsername: text("display_username"),
   /* ---- Lumina 业务字段 ---- */
