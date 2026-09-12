@@ -43,3 +43,34 @@ self.addEventListener("fetch", (event) => {
     fetch(event.request).catch(() => caches.match(event.request)),
   );
 });
+
+self.addEventListener("push", (event) => {
+  let data;
+  try {
+    data = JSON.parse(event.data.text());
+  } catch {
+    data = { title: "Lumina 流光", body: "新消息" };
+  }
+
+  const options = {
+    body: data.body || "",
+    icon: "/manifest-icon-192.png",
+    badge: "/manifest-icon-192.png",
+    tag: data.conversationId || "lumina-notification",
+    data: { conversationId: data.conversationId },
+  };
+
+  event.waitUntil(self.registration.showNotification(data.title || "Lumina 流光", options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const conversationId = event.notification.data?.conversationId;
+  const url = conversationId ? `/?conv=${conversationId}` : "/";
+  event.waitUntil(self.clients.matchAll({ type: "window" }).then((clients) => {
+    for (const client of clients) {
+      if (client.url.includes(url) && "focus" in client) return client.focus();
+    }
+    if (self.clients.openWindow) return self.clients.openWindow(url);
+  }));
+});

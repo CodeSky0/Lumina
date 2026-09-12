@@ -2,6 +2,7 @@
 
 import type { ConversationItem } from "@/lib/messages/actions";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { PushSubscribe } from "@/components/push-subscribe";
 import { NotificationBell } from "./notification-bell";
 
 const GROUP_ICON = (
@@ -97,6 +98,7 @@ export function ContactSidebar({
       <div className="flex items-center justify-between border-t border-border px-4 py-2">
         <div className="flex items-center gap-1">
           <NotificationBell />
+          <PushSubscribe />
           <ThemeToggle />
         </div>
         <span className="text-caption-10 text-neutral-5">Lumina 流光</span>

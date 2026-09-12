@@ -3,6 +3,7 @@
 import { getCurrentSession } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db";
 import { and, desc, eq, isNull } from "drizzle-orm";
+import { sendPushToUser } from "@/lib/push/actions";
 
 export type NotificationItem = {
   id: string;
@@ -105,4 +106,14 @@ export async function createNotification(input: {
     body: input.body,
     conversationId: input.conversationId,
   });
+
+  try {
+    await sendPushToUser(input.userId, {
+      title: input.title,
+      body: input.body,
+      conversationId: input.conversationId,
+    });
+  } catch {
+    /* push failure should not block notification creation */
+  }
 }

@@ -15,6 +15,9 @@ const envSchema = z.object({
     .default("http://localhost:3000"),
   CF_WORKER_URL: z.string().url().optional(),
   CF_WORKER_AUTH_TOKEN: z.string().optional(),
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
