@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { motion } from "motion/react";
 import type { ClassMessage } from "@/lib/messages/actions";
 import { recallMessage, editMessage } from "@/lib/messages/actions";
@@ -105,6 +105,97 @@ function renderTextWithMentions(
   return <p className="whitespace-pre-wrap text-copy-14">{parts}</p>;
 }
 
+function AudioPlayer({ content }: { content: string }) {
+  let info: { url: string; duration: number } | null = null;
+  try {
+    info = JSON.parse(content);
+  } catch {
+    return <p className="text-copy-14">语音解析失败</p>;
+  }
+  if (!info) return null;
+
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const el = audio;
+    function onTimeUpdate() {
+      if (!el.duration || !isFinite(el.duration)) return;
+      setProgress(el.currentTime / el.duration);
+      setCurrent(el.currentTime);
+    }
+    function onEnded() {
+      setPlaying(false);
+      setProgress(0);
+      setCurrent(0);
+    }
+    el.addEventListener("timeupdate", onTimeUpdate);
+    el.addEventListener("ended", onEnded);
+    return () => {
+      el.removeEventListener("timeupdate", onTimeUpdate);
+      el.removeEventListener("ended", onEnded);
+    };
+  }, []);
+
+  function togglePlay() {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (playing) {
+      audio.pause();
+      setPlaying(false);
+    } else {
+      void audio.play();
+      setPlaying(true);
+    }
+  }
+
+  const displayDuration = info.duration || 0;
+  const displayCurrent = Math.floor(current);
+
+  function formatSec(sec: number): string {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  }
+
+  return (
+    <div className="flex items-center gap-2 min-w-[180px]">
+      <audio ref={audioRef} src={info.url} preload="metadata" />
+      <button
+        onClick={togglePlay}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
+      >
+        {playing ? (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="4" width="4" height="16" rx="1" />
+            <rect x="14" y="4" width="4" height="16" rx="1" />
+          </svg>
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        )}
+      </button>
+      <div className="flex-1">
+        <div className="h-1.5 rounded-full bg-white/20">
+          <div
+            className="h-1.5 rounded-full bg-white/60 transition-all"
+            style={{ width: `${progress * 100}%` }}
+          />
+        </div>
+        <div className="mt-0.5 flex justify-between text-caption-10 opacity-70">
+          <span>{formatSec(displayCurrent)}</span>
+          <span>{formatSec(displayDuration)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MessageBubble({
   msg,
   isSelf,
@@ -193,6 +284,8 @@ export function MessageBubble({
               alt="图片消息"
               className="max-h-60 rounded-lg"
             />
+          ) : msg.type === "audio" ? (
+            <AudioPlayer content={msg.content} />
           ) : msg.type === "file" ? (
             <FileCard content={msg.content} />
           ) : editing ? (

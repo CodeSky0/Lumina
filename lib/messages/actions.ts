@@ -96,9 +96,13 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         lastMessagePreview: lastMsg[0]
           ? lastMsg[0].type === "image"
             ? "[图片]"
-            : lastMsg[0].type === "urgent"
-              ? "[紧急] " + lastMsg[0].content
-              : lastMsg[0].content
+            : lastMsg[0].type === "audio"
+              ? "[语音]"
+              : lastMsg[0].type === "file"
+                ? "[文件]"
+                : lastMsg[0].type === "urgent"
+                  ? "[紧急] " + lastMsg[0].content
+                  : lastMsg[0].content
           : null,
         lastMessageAt: lastMsg[0]?.createdAt ?? null,
         unreadCount: 0,
@@ -182,9 +186,13 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         lastMessagePreview: lastMsg[0]
           ? lastMsg[0].type === "image"
             ? "[图片]"
-            : lastMsg[0].type === "urgent"
-              ? "[紧急] " + lastMsg[0].content
-              : lastMsg[0].content
+            : lastMsg[0].type === "audio"
+              ? "[语音]"
+              : lastMsg[0].type === "file"
+                ? "[文件]"
+                : lastMsg[0].type === "urgent"
+                  ? "[紧急] " + lastMsg[0].content
+                  : lastMsg[0].content
           : null,
         lastMessageAt: lastMsg[0]?.createdAt ?? null,
         unreadCount: 0,
@@ -247,9 +255,13 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         lastMessagePreview: lastMsg[0]
           ? lastMsg[0].type === "image"
             ? "[图片]"
-            : lastMsg[0].type === "urgent"
-              ? "[紧急] " + lastMsg[0].content
-              : lastMsg[0].content
+            : lastMsg[0].type === "audio"
+              ? "[语音]"
+              : lastMsg[0].type === "file"
+                ? "[文件]"
+                : lastMsg[0].type === "urgent"
+                  ? "[紧急] " + lastMsg[0].content
+                  : lastMsg[0].content
           : null,
         lastMessageAt: lastMsg[0]?.createdAt ?? null,
         unreadCount: 0,
@@ -344,9 +356,13 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         lastMessagePreview: lastMsg[0]
           ? lastMsg[0].type === "image"
             ? "[图片]"
-            : lastMsg[0].type === "urgent"
-              ? "[紧急] " + lastMsg[0].content
-              : lastMsg[0].content
+            : lastMsg[0].type === "audio"
+              ? "[语音]"
+              : lastMsg[0].type === "file"
+                ? "[文件]"
+                : lastMsg[0].type === "urgent"
+                  ? "[紧急] " + lastMsg[0].content
+                  : lastMsg[0].content
           : null,
         lastMessageAt: lastMsg[0]?.createdAt ?? null,
         unreadCount: 0,
@@ -407,9 +423,13 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         lastMessagePreview: lastMsg[0]
           ? lastMsg[0].type === "image"
             ? "[图片]"
-            : lastMsg[0].type === "urgent"
-              ? "[紧急] " + lastMsg[0].content
-              : lastMsg[0].content
+            : lastMsg[0].type === "audio"
+              ? "[语音]"
+              : lastMsg[0].type === "file"
+                ? "[文件]"
+                : lastMsg[0].type === "urgent"
+                  ? "[紧急] " + lastMsg[0].content
+                  : lastMsg[0].content
           : null,
         lastMessageAt: lastMsg[0]?.createdAt ?? null,
         unreadCount: 0,
@@ -630,11 +650,18 @@ export async function sendMessage(
 
   if (file && file.size > 0) {
     const isImage = file.type.startsWith("image/");
+    const isAudio = file.type.startsWith("audio/");
     if (isImage) {
       const upload = await uploadImage(file);
       if (!upload.ok) return upload;
       content = upload.url;
       type = urgent ? "urgent" : "image";
+      mimeType = upload.mimeType;
+    } else if (isAudio) {
+      const upload = await uploadFile(file);
+      if (!upload.ok) return upload;
+      content = JSON.stringify({ url: upload.url, duration: Number(formData.get("duration") ?? 0) });
+      type = "audio";
       mimeType = upload.mimeType;
     } else {
       const upload = await uploadFile(file);

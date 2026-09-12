@@ -26,6 +26,13 @@ export function MessageInput({
   const [mentions, setMentions] = useState<{ userId: string; name: string }[]>([]);
   const [mentionIndex, setMentionIndex] = useState(0);
 
+  const [recording, setRecording] = useState(false);
+  const [recordDuration, setRecordDuration] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recordStreamRef = useRef<MediaStream | null>(null);
+
   const isGroup = conversationType === "group";
 
   useEffect(() => {
@@ -148,6 +155,75 @@ export function MessageInput({
     });
   }
 
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordStreamRef.current = stream;
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.start();
+      setRecording(true);
+      setRecordDuration(0);
+      recordTimerRef.current = setInterval(() => {
+        setRecordDuration((d) => d + 1);
+      }, 1000);
+    } catch {
+      setFeedback("无法访问麦克风，请检查权限");
+    }
+  }
+
+  function stopRecording(send: boolean) {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder) return;
+
+    if (recordTimerRef.current) {
+      clearInterval(recordTimerRef.current);
+      recordTimerRef.current = null;
+    }
+
+    const duration = recordDuration;
+
+    recorder.onstop = () => {
+      if (send && audioChunksRef.current.length > 0) {
+        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        const ext = (recorder.mimeType || "audio/webm").includes("ogg") ? "ogg" : "webm";
+        const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: blob.type });
+        const fd = new FormData();
+        fd.set("conversationId", conversationId);
+        fd.set("text", "");
+        fd.set("file", file);
+        fd.set("duration", String(duration));
+        startTransition(async () => {
+          try {
+            const res = await sendMessage(fd);
+            if (!res.ok) setFeedback(res.error);
+          } catch {
+            setFeedback("语音发送失败，请重试");
+          }
+        });
+      }
+      recordStreamRef.current?.getTracks().forEach((t) => t.stop());
+      recordStreamRef.current = null;
+      mediaRecorderRef.current = null;
+      audioChunksRef.current = [];
+    };
+
+    recorder.stop();
+    setRecording(false);
+  }
+
+  function formatDuration(sec: number): string {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-2">
       {feedback && (
@@ -175,49 +251,90 @@ export function MessageInput({
             ))}
           </div>
         )}
-        <label className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-neutral-2 text-neutral-7 ring-1 ring-border transition-colors hover:bg-neutral-3">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-          </svg>
-          <input
-            ref={fileRef}
-            type="file"
-            name="file"
-            className="hidden"
-          />
-        </label>
-        {allowUrgent && (
-          <button
-            type="button"
-            onClick={() => setUrgent((v) => !v)}
-            className={`flex h-9 shrink-0 items-center gap-1 rounded-lg px-2 text-copy-13 ring-1 transition-colors ${
-              urgent
-                ? "bg-error text-white ring-error"
-                : "bg-neutral-2 text-neutral-7 ring-border hover:bg-neutral-3"
-            }`}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
-            </svg>
-            紧急
-          </button>
+        {recording ? (
+          <>
+            <div className="flex flex-1 items-center gap-3 rounded-lg bg-error/10 px-3 py-2 ring-1 ring-error">
+              <span className="flex h-3 w-3 shrink-0 items-center justify-center">
+                <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-error" />
+              </span>
+              <span className="text-copy-14 text-error">{formatDuration(recordDuration)}</span>
+              <span className="text-copy-13 text-neutral-6">录音中…</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => stopRecording(false)}
+              className="flex h-9 shrink-0 items-center justify-center rounded-lg bg-neutral-2 px-3 text-copy-13 text-neutral-7 ring-1 ring-border transition-colors hover:bg-neutral-3"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={() => stopRecording(true)}
+              disabled={pending}
+              className="flex h-9 shrink-0 items-center justify-center rounded-lg bg-accent px-4 text-copy-14 font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
+            >
+              {pending ? "发送中" : "发送"}
+            </button>
+          </>
+        ) : (
+          <>
+            <label className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-neutral-2 text-neutral-7 ring-1 ring-border transition-colors hover:bg-neutral-3">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+              </svg>
+              <input
+                ref={fileRef}
+                type="file"
+                name="file"
+                className="hidden"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={startRecording}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neutral-2 text-neutral-7 ring-1 ring-border transition-colors hover:bg-neutral-3"
+              title="语音消息"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" x2="12" y1="19" y2="22" />
+              </svg>
+            </button>
+            {allowUrgent && (
+              <button
+                type="button"
+                onClick={() => setUrgent((v) => !v)}
+                className={`flex h-9 shrink-0 items-center gap-1 rounded-lg px-2 text-copy-13 ring-1 transition-colors ${
+                  urgent
+                    ? "bg-error text-white ring-error"
+                    : "bg-neutral-2 text-neutral-7 ring-border hover:bg-neutral-3"
+                }`}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+                </svg>
+                紧急
+              </button>
+            )}
+            <textarea
+              ref={textareaRef}
+              value={text}
+              onChange={handleTextChange}
+              rows={1}
+              placeholder={isGroup ? "输入消息… @提及成员" : "输入消息…"}
+              className="flex-1 resize-none rounded-lg bg-neutral-1 px-3 py-2 text-copy-14 text-neutral-9 ring-1 ring-border outline-none focus:ring-2 focus:ring-accent"
+              onKeyDown={handleKeyDown}
+            />
+            <button
+              type="submit"
+              disabled={pending || (!text.trim() && !fileRef.current?.files?.[0])}
+              className="flex h-9 shrink-0 items-center justify-center rounded-lg bg-accent px-4 text-copy-14 font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
+            >
+              {pending ? "发送中" : "发送"}
+            </button>
+          </>
         )}
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={handleTextChange}
-          rows={1}
-          placeholder={isGroup ? "输入消息… @提及成员" : "输入消息…"}
-          className="flex-1 resize-none rounded-lg bg-neutral-1 px-3 py-2 text-copy-14 text-neutral-9 ring-1 ring-border outline-none focus:ring-2 focus:ring-accent"
-          onKeyDown={handleKeyDown}
-        />
-        <button
-          type="submit"
-          disabled={pending || (!text.trim() && !fileRef.current?.files?.[0])}
-          className="flex h-9 shrink-0 items-center justify-center rounded-lg bg-accent px-4 text-copy-14 font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
-        >
-          {pending ? "发送中" : "发送"}
-        </button>
       </div>
     </form>
   );
