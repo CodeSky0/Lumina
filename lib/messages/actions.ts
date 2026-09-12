@@ -36,6 +36,7 @@ export type ConversationItem = {
 };
 
 export async function getMyConversations(): Promise<ConversationItem[]> {
+  try {
   const session = await getCurrentSession();
   if (!session) return [];
   const user = session.user;
@@ -508,6 +509,9 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
   });
 
   return items;
+  } catch {
+    return [];
+  }
 }
 
 /* ------------------------------ 群成员列表（@提及） ------------------------------ */

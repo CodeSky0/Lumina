@@ -23,26 +23,30 @@ export type AnnouncementItem = {
 export async function getClassAnnouncements(
   classId: string,
 ): Promise<AnnouncementItem[]> {
-  const session = await getCurrentSession();
-  if (!session) return [];
+  try {
+    const session = await getCurrentSession();
+    if (!session) return [];
 
-  const rows = await db
-    .select({
-      id: schema.announcements.id,
-      classId: schema.announcements.classId,
-      title: schema.announcements.title,
-      content: schema.announcements.content,
-      createdBy: schema.announcements.createdBy,
-      creatorName: schema.users.name,
-      createdAt: schema.announcements.createdAt,
-    })
-    .from(schema.announcements)
-    .innerJoin(schema.users, eq(schema.announcements.createdBy, schema.users.id))
-    .where(eq(schema.announcements.classId, classId))
-    .orderBy(desc(schema.announcements.createdAt))
-    .limit(20);
+    const rows = await db
+      .select({
+        id: schema.announcements.id,
+        classId: schema.announcements.classId,
+        title: schema.announcements.title,
+        content: schema.announcements.content,
+        createdBy: schema.announcements.createdBy,
+        creatorName: schema.users.name,
+        createdAt: schema.announcements.createdAt,
+      })
+      .from(schema.announcements)
+      .innerJoin(schema.users, eq(schema.announcements.createdBy, schema.users.id))
+      .where(eq(schema.announcements.classId, classId))
+      .orderBy(desc(schema.announcements.createdAt))
+      .limit(20);
 
-  return rows;
+    return rows;
+  } catch {
+    return [];
+  }
 }
 
 const createSchema = z.object({

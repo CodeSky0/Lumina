@@ -16,80 +16,96 @@ export type NotificationItem = {
 };
 
 export async function getMyNotifications(): Promise<NotificationItem[]> {
-  const session = await getCurrentSession();
-  if (!session) return [];
+  try {
+    const session = await getCurrentSession();
+    if (!session) return [];
 
-  const rows = await db
-    .select({
-      id: schema.notifications.id,
-      type: schema.notifications.type,
-      title: schema.notifications.title,
-      body: schema.notifications.body,
-      conversationId: schema.notifications.conversationId,
-      readAt: schema.notifications.readAt,
-      createdAt: schema.notifications.createdAt,
-    })
-    .from(schema.notifications)
-    .where(eq(schema.notifications.userId, session.user.id))
-    .orderBy(desc(schema.notifications.createdAt))
-    .limit(50);
+    const rows = await db
+      .select({
+        id: schema.notifications.id,
+        type: schema.notifications.type,
+        title: schema.notifications.title,
+        body: schema.notifications.body,
+        conversationId: schema.notifications.conversationId,
+        readAt: schema.notifications.readAt,
+        createdAt: schema.notifications.createdAt,
+      })
+      .from(schema.notifications)
+      .where(eq(schema.notifications.userId, session.user.id))
+      .orderBy(desc(schema.notifications.createdAt))
+      .limit(50);
 
-  return rows;
+    return rows;
+  } catch {
+    return [];
+  }
 }
 
 export async function getUnreadNotificationCount(): Promise<number> {
-  const session = await getCurrentSession();
-  if (!session) return 0;
+  try {
+    const session = await getCurrentSession();
+    if (!session) return 0;
 
-  const rows = await db
-    .select({ id: schema.notifications.id })
-    .from(schema.notifications)
-    .where(
-      and(
-        eq(schema.notifications.userId, session.user.id),
-        isNull(schema.notifications.readAt),
-      ),
-    );
+    const rows = await db
+      .select({ id: schema.notifications.id })
+      .from(schema.notifications)
+      .where(
+        and(
+          eq(schema.notifications.userId, session.user.id),
+          isNull(schema.notifications.readAt),
+        ),
+      );
 
-  return rows.length;
+    return rows.length;
+  } catch {
+    return 0;
+  }
 }
 
 export async function markNotificationRead(
   notificationId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const session = await getCurrentSession();
-  if (!session) return { ok: false, error: "未登录" };
+  try {
+    const session = await getCurrentSession();
+    if (!session) return { ok: false, error: "未登录" };
 
-  await db
-    .update(schema.notifications)
-    .set({ readAt: new Date() })
-    .where(
-      and(
-        eq(schema.notifications.id, notificationId),
-        eq(schema.notifications.userId, session.user.id),
-      ),
-    );
+    await db
+      .update(schema.notifications)
+      .set({ readAt: new Date() })
+      .where(
+        and(
+          eq(schema.notifications.id, notificationId),
+          eq(schema.notifications.userId, session.user.id),
+        ),
+      );
 
-  return { ok: true };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "操作失败" };
+  }
 }
 
 export async function markAllNotificationsRead(): Promise<
   { ok: true } | { ok: false; error: string }
 > {
-  const session = await getCurrentSession();
-  if (!session) return { ok: false, error: "未登录" };
+  try {
+    const session = await getCurrentSession();
+    if (!session) return { ok: false, error: "未登录" };
 
-  await db
-    .update(schema.notifications)
-    .set({ readAt: new Date() })
-    .where(
-      and(
-        eq(schema.notifications.userId, session.user.id),
-        isNull(schema.notifications.readAt),
-      ),
-    );
+    await db
+      .update(schema.notifications)
+      .set({ readAt: new Date() })
+      .where(
+        and(
+          eq(schema.notifications.userId, session.user.id),
+          isNull(schema.notifications.readAt),
+        ),
+      );
 
-  return { ok: true };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "操作失败" };
+  }
 }
 
 export async function createNotification(input: {
@@ -99,13 +115,17 @@ export async function createNotification(input: {
   body?: string;
   conversationId?: string;
 }): Promise<void> {
-  await db.insert(schema.notifications).values({
-    userId: input.userId,
-    type: input.type,
-    title: input.title,
-    body: input.body,
-    conversationId: input.conversationId,
-  });
+  try {
+    await db.insert(schema.notifications).values({
+      userId: input.userId,
+      type: input.type,
+      title: input.title,
+      body: input.body,
+      conversationId: input.conversationId,
+    });
+  } catch {
+    /* notifications 表可能尚未创建，不阻断主流程 */
+  }
 
   try {
     await sendPushToUser(input.userId, {
