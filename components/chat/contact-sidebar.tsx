@@ -5,6 +5,7 @@ import type { ConversationItem } from "@/lib/messages/actions";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { PushSubscribe } from "@/components/push-subscribe";
 import { NotificationBell } from "./notification-bell";
+import { EASE } from "@/lib/motion";
 
 const GROUP_ICON = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -129,9 +130,24 @@ function ContactItem({
       })
     : null;
 
+  function handleMouseMove(e: React.MouseEvent<HTMLButtonElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 6;
+    const y = ((e.clientY - rect.top) / rect.height - 0.5) * 4;
+    e.currentTarget.style.setProperty("--mx", `${x.toFixed(1)}px`);
+    e.currentTarget.style.setProperty("--my", `${y.toFixed(1)}px`);
+  }
+
+  function handleMouseLeave(e: React.MouseEvent<HTMLButtonElement>) {
+    e.currentTarget.style.setProperty("--mx", "0px");
+    e.currentTarget.style.setProperty("--my", "0px");
+  }
+
   return (
     <button
       onClick={onClick}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
       className={`relative flex w-full items-start gap-2 rounded-lg px-2 py-2 text-left transition-colors ${
         selected
           ? "bg-accent/10 ring-1 ring-accent"
@@ -139,16 +155,25 @@ function ContactItem({
       }`}
     >
       {selected && (
-        <motion.span
-          layoutId="contact-active-bar"
-          className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-accent"
-          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-        />
+        <>
+          <motion.span
+            layoutId="contact-active-glow"
+            aria-hidden
+            className="absolute left-0 top-1/2 h-9 w-2 -translate-y-1/2 rounded-full bg-accent opacity-60 blur-sm"
+            transition={{ duration: 0.45, ease: EASE.spring }}
+          />
+          <motion.span
+            layoutId="contact-active-bar"
+            className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-accent"
+            transition={{ duration: 0.45, ease: EASE.spring }}
+          />
+        </>
       )}
       <div
-        className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+        className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-fast ease-out ${
           selected ? "bg-accent text-white" : "bg-neutral-2 text-neutral-7"
         }`}
+        style={{ transform: "translate(var(--mx, 0px), var(--my, 0px))" }}
       >
         {icon}
       </div>
@@ -186,7 +211,10 @@ function ContactItem({
               </svg>
             )}
             {item.unreadCount > 0 && (
-              <span className={`rounded-full px-1.5 py-0.5 text-caption-10 font-medium text-white ${item.muted ? "bg-neutral-5" : "bg-error"}`}>
+              <span
+                key={item.unreadCount}
+                className={`animate-badge-bounce rounded-full px-1.5 py-0.5 text-caption-10 font-medium text-white ${item.muted ? "bg-neutral-5" : "bg-error"}`}
+              >
                 {item.unreadCount > 99 ? "99+" : item.unreadCount}
               </span>
             )}

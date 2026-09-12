@@ -4,6 +4,19 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { authClient } from "@/lib/auth/client";
+import { staggerContainer, charItem, springPop, springTransition } from "@/lib/motion";
+
+const TITLE = "Lumina 流光";
+
+const PARTICLES = Array.from({ length: 14 }, (_, i) => ({
+  id: i,
+  left: `${(i * 37 + 5) % 100}%`,
+  top: `${(i * 61 + 8) % 100}%`,
+  dx: `${(((i % 5) - 2) * 50)}px`,
+  dy: `${(((i % 3) - 1) * 40 - 20)}px`,
+  delay: `${(i * 0.65).toFixed(2)}s`,
+  size: i % 3 === 0 ? 9 : 5,
+}));
 
 export default function LoginPage() {
   const router = useRouter();
@@ -41,19 +54,51 @@ export default function LoginPage() {
         <div className="absolute -left-1/4 -top-1/4 h-3/5 w-3/5 rounded-full bg-accent/20 blur-3xl animate-aurora" />
         <div className="absolute -bottom-1/4 -right-1/4 h-3/5 w-3/5 rounded-full bg-accent/10 blur-3xl animate-aurora-alt" />
         <div className="absolute left-1/2 top-1/2 h-1/3 w-1/3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-success/5 blur-3xl animate-float" />
+        {PARTICLES.map((p) => (
+          <span
+            key={p.id}
+            className="absolute rounded-full bg-accent/40 blur-[1px] animate-drift"
+            style={
+              {
+                left: p.left,
+                top: p.top,
+                width: p.size,
+                height: p.size,
+                "--dx": p.dx,
+                "--dy": p.dy,
+                animationDelay: p.delay,
+              } as React.CSSProperties
+            }
+          />
+        ))}
       </div>
 
       <motion.form
         onSubmit={handleSubmit}
+        variants={springPop}
+        initial="hidden"
+        animate="visible"
+        transition={springTransition}
         className="relative w-full max-w-sm space-y-6 rounded-xl bg-neutral-2/80 p-8 ring-1 ring-border backdrop-blur-sm"
-        initial={{ opacity: 0, y: 16, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
       >
         <div className="space-y-1">
-          <h1 className="font-serif text-title-28 font-medium text-neutral-10">
-            Lumina 流光
-          </h1>
+          <motion.h1
+            variants={staggerContainer(0.07)}
+            initial="hidden"
+            animate="visible"
+            className="font-serif text-title-28 font-medium text-neutral-10"
+          >
+            {TITLE.split("").map((ch, i) => (
+              <motion.span
+                key={i}
+                variants={charItem}
+                className="inline-block"
+                style={{ whiteSpace: ch === " " ? "pre" : "normal" }}
+              >
+                {ch}
+              </motion.span>
+            ))}
+          </motion.h1>
           <p className="text-copy-13 text-neutral-7">家校沟通平台</p>
           <div className="relative mt-2 h-px overflow-hidden bg-neutral-4/40">
             <div className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-accent to-transparent animate-shimmer" />
@@ -100,16 +145,28 @@ export default function LoginPage() {
             {error}
           </motion.p>
         )}
-        <button
-          type="submit"
-          disabled={loading}
-          className="relative w-full overflow-hidden rounded-md bg-accent py-2.5 text-copy-14 font-medium text-white transition-all duration-fast ease-standard hover:opacity-90 disabled:opacity-50"
-        >
-          <span className="relative z-10">{loading ? "登录中…" : "登录"}</span>
+        <div className="relative">
           {!loading && (
-            <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+            <span
+              aria-hidden
+              className="pointer-events-none absolute -inset-1 rounded-lg animate-orbit opacity-50"
+              style={{
+                background:
+                  "conic-gradient(from 0deg, transparent 0deg, var(--color-accent) 35deg, transparent 95deg, transparent 360deg)",
+              }}
+            />
           )}
-        </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="relative z-10 w-full overflow-hidden rounded-md bg-accent py-2.5 text-copy-14 font-medium text-white transition-all duration-fast ease-standard hover:opacity-90 disabled:opacity-50"
+          >
+            <span className="relative z-10">{loading ? "登录中…" : "登录"}</span>
+            {!loading && (
+              <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+            )}
+          </button>
+        </div>
       </motion.form>
     </main>
   );

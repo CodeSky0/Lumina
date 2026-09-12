@@ -1,8 +1,10 @@
 "use client";
 
 import { useRef, useState, useTransition, useEffect, useMemo } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { sendMessage, getGroupMembers, type GroupMember } from "@/lib/messages/actions";
 import type { ConversationType } from "@/lib/db/schema";
+import { EASE } from "@/lib/motion";
 
 export function MessageInput({
   conversationId,
@@ -34,6 +36,21 @@ export function MessageInput({
   const recordStreamRef = useRef<MediaStream | null>(null);
 
   const isGroup = conversationType === "group";
+
+  const [bursts, setBursts] = useState<{ id: number; particles: { angle: number; dist: number }[] }[]>([]);
+  const [sendHovered, setSendHovered] = useState(false);
+
+  function triggerBurst() {
+    const id = Date.now();
+    const particles = Array.from({ length: 10 }, () => ({
+      angle: Math.random() * Math.PI * 2,
+      dist: 26 + Math.random() * 16,
+    }));
+    setBursts((prev) => [...prev, { id, particles }]);
+    window.setTimeout(() => {
+      setBursts((prev) => prev.filter((b) => b.id !== id));
+    }, 700);
+  }
 
   useEffect(() => {
     if (!isGroup) return;
@@ -326,13 +343,50 @@ export function MessageInput({
               className="flex-1 resize-none rounded-lg bg-neutral-1 px-3 py-2 text-copy-14 text-neutral-9 ring-1 ring-border outline-none focus:ring-2 focus:ring-accent"
               onKeyDown={handleKeyDown}
             />
-            <button
-              type="submit"
-              disabled={pending || (!text.trim() && !fileRef.current?.files?.[0])}
-              className="flex h-9 shrink-0 items-center justify-center rounded-lg bg-accent px-4 text-copy-14 font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
+            <div
+              className="relative"
+              onMouseEnter={() => setSendHovered(true)}
+              onMouseLeave={() => setSendHovered(false)}
             >
-              {pending ? "发送中" : "发送"}
-            </button>
+              <motion.span
+                aria-hidden
+                className="pointer-events-none absolute -inset-1 rounded-lg bg-accent/30 blur-md"
+                animate={sendHovered ? { opacity: [0.4, 0.7, 0.4], scale: [1, 1.15, 1] } : { opacity: 0, scale: 1 }}
+                transition={sendHovered ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3, ease: EASE.out }}
+              />
+              <button
+                type="submit"
+                onClick={triggerBurst}
+                disabled={pending || (!text.trim() && !fileRef.current?.files?.[0])}
+                className="relative flex h-9 shrink-0 items-center justify-center rounded-lg bg-accent px-4 text-copy-14 font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
+              >
+                <span className="relative z-10">{pending ? "发送中" : "发送"}</span>
+                {pending && (
+                  <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shimmer" />
+                )}
+                <AnimatePresence>
+                  {bursts.map((burst) => (
+                    <span key={burst.id} className="pointer-events-none absolute inset-0">
+                      {burst.particles.map((p, i) => (
+                        <motion.span
+                          key={i}
+                          className="absolute left-1/2 top-1/2 h-1.5 w-1.5 rounded-full bg-accent"
+                          initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
+                          animate={{
+                            x: Math.cos(p.angle) * p.dist,
+                            y: Math.sin(p.angle) * p.dist,
+                            opacity: 0,
+                            scale: 0.3,
+                          }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.6, ease: EASE.out }}
+                        />
+                      ))}
+                    </span>
+                  ))}
+                </AnimatePresence>
+              </button>
+            </div>
           </>
         )}
       </div>

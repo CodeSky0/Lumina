@@ -4,6 +4,15 @@ import { useState, useTransition, useRef, useEffect } from "react";
 import { motion } from "motion/react";
 import type { ClassMessage } from "@/lib/messages/actions";
 import { recallMessage, editMessage } from "@/lib/messages/actions";
+import {
+  springPop,
+  springTransition,
+  staggerContainer,
+  charItem,
+  inkBloom,
+  checkDraw,
+  EASE,
+} from "@/lib/motion";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "待送达",
@@ -196,6 +205,73 @@ function AudioPlayer({ content }: { content: string }) {
   );
 }
 
+function CharStagger({ text }: { text: string }) {
+  return (
+    <motion.p
+      variants={staggerContainer(0.03)}
+      initial="hidden"
+      animate="visible"
+      className="whitespace-pre-wrap text-copy-14"
+    >
+      {text.split("").map((ch, i) => (
+        <motion.span
+          key={i}
+          variants={charItem}
+          className="inline-block"
+          style={{ whiteSpace: ch === " " ? "pre" : "normal" }}
+        >
+          {ch}
+        </motion.span>
+      ))}
+    </motion.p>
+  );
+}
+
+function StatusTick({ status }: { status: string }) {
+  if (status === "pending") {
+    return <span className="text-neutral-5">{STATUS_LABEL[status]}</span>;
+  }
+  const displayed = status === "displayed";
+  return (
+    <span className="flex items-center gap-0.5 text-neutral-5">
+      <svg
+        width="11"
+        height="11"
+        viewBox="0 0 16 16"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <motion.path d="M2 8.5 L6 12 L14 4" variants={checkDraw} initial="hidden" animate="visible" />
+      </svg>
+      {displayed && (
+        <svg
+          width="11"
+          height="11"
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="-ml-1.5"
+        >
+          <motion.path
+            d="M2 8.5 L6 12 L14 4"
+            variants={checkDraw}
+            initial="hidden"
+            animate="visible"
+            transition={{ delay: 0.18 }}
+          />
+        </svg>
+      )}
+      <span className="ml-0.5">{STATUS_LABEL[status]}</span>
+    </span>
+  );
+}
+
 export function MessageBubble({
   msg,
   isSelf,
@@ -248,9 +324,11 @@ export function MessageBubble({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10, scale: 0.96 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.32, ease: [0.34, 1.56, 0.64, 1] }}
+      variants={springPop}
+      initial="hidden"
+      animate="visible"
+      exit={{ opacity: 0, scale: 0.8, y: -4, transition: { duration: 0.2, ease: EASE.in } }}
+      transition={springTransition}
       className={`group flex ${isSelf ? "justify-end" : "justify-start"}`}
     >
       <div className={`max-w-[70%] ${isSelf ? "items-end" : "items-start"}`}>
@@ -269,56 +347,78 @@ export function MessageBubble({
             )}
           </div>
         )}
-        <div
-          className={`relative rounded-xl px-3 py-2 ${
-            isSelf
-              ? "bg-accent text-white"
-              : msg.type === "urgent"
-                ? "bg-error/10 text-neutral-9 ring-1 ring-error"
-                : "bg-neutral-2 text-neutral-9 ring-1 ring-border"
-          }`}
-        >
-          {msg.type === "urgent" && !isSelf && (
-            <span aria-hidden className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-error animate-pulse-ring" />
-          )}
-          {msg.type === "image" ? (
-            <img
-              src={msg.content}
-              alt="图片消息"
-              className="max-h-60 rounded-lg"
+        <div className="relative">
+          {isSelf && (
+            <motion.span
+              aria-hidden
+              variants={inkBloom}
+              initial="hidden"
+              animate="visible"
+              className="pointer-events-none absolute inset-0 rounded-xl bg-accent blur-md"
             />
-          ) : msg.type === "audio" ? (
-            <AudioPlayer content={msg.content} />
-          ) : msg.type === "file" ? (
-            <FileCard content={msg.content} />
-          ) : editing ? (
-            <div className="flex flex-col gap-2">
-              <textarea
-                value={editText}
-                onChange={(e) => setEditText(e.target.value)}
-                className="w-full resize-none rounded-md bg-white/20 px-2 py-1 text-copy-14 outline-none ring-1 ring-white/30 focus:ring-2"
-                rows={2}
-                autoFocus
-              />
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => setEditing(false)}
-                  className="text-caption-10 opacity-80 hover:opacity-100"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={handleEdit}
-                  disabled={pending}
-                  className="text-caption-10 font-medium opacity-80 hover:opacity-100 disabled:opacity-50"
-                >
-                  保存
-                </button>
-              </div>
-            </div>
-          ) : (
-            renderTextWithMentions(msg.content, msg.mentions)
           )}
+          <div className={msg.type === "urgent" ? "animate-shake" : undefined}>
+            <div
+              className={`relative rounded-xl px-3 py-2 ${
+                isSelf
+                  ? "bg-accent text-white"
+                  : msg.type === "urgent"
+                    ? "bg-error/10 text-neutral-9 ring-1 ring-error"
+                    : "bg-neutral-2 text-neutral-9 ring-1 ring-border"
+              }`}
+            >
+              {msg.type === "urgent" && !isSelf && (
+                <>
+                  <span aria-hidden className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-error animate-pulse-ring" />
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-error animate-pulse-ring"
+                    style={{ animationDelay: "1.3s" }}
+                  />
+                </>
+              )}
+              {msg.type === "image" ? (
+                <img
+                  src={msg.content}
+                  alt="图片消息"
+                  className="max-h-60 rounded-lg"
+                />
+              ) : msg.type === "audio" ? (
+                <AudioPlayer content={msg.content} />
+              ) : msg.type === "file" ? (
+                <FileCard content={msg.content} />
+              ) : editing ? (
+                <div className="flex flex-col gap-2">
+                  <textarea
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    className="w-full resize-none rounded-md bg-white/20 px-2 py-1 text-copy-14 outline-none ring-1 ring-white/30 focus:ring-2"
+                    rows={2}
+                    autoFocus
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => setEditing(false)}
+                      className="text-caption-10 opacity-80 hover:opacity-100"
+                    >
+                      取消
+                    </button>
+                    <button
+                      onClick={handleEdit}
+                      disabled={pending}
+                      className="text-caption-10 font-medium opacity-80 hover:opacity-100 disabled:opacity-50"
+                    >
+                      保存
+                    </button>
+                  </div>
+                </div>
+              ) : isSelf && msg.type === "text" && msg.content.length <= 12 ? (
+                <CharStagger text={msg.content} />
+              ) : (
+                renderTextWithMentions(msg.content, msg.mentions)
+              )}
+            </div>
+          </div>
         </div>
         <div className={`mt-1 flex items-center gap-2 text-caption-10 text-neutral-6 ${isSelf ? "justify-end" : "justify-start"}`}>
           <span>{time}</span>
@@ -326,7 +426,7 @@ export function MessageBubble({
             <span className="text-neutral-5">已编辑</span>
           )}
           {isSelf && showStatus && (
-            <span>{STATUS_LABEL[msg.status]}</span>
+            <StatusTick status={msg.status} />
           )}
           {isSelf && msg.type === "urgent" && (
             <span className="text-error">紧急</span>

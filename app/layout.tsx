@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ServiceWorkerRegister } from "@/components/sw-register";
+import { RouteCurtain } from "@/components/route-curtain";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,6 +20,7 @@ export default function RootLayout({
     <html lang="zh-CN" className="font-sans" suppressHydrationWarning>
       <body className="min-h-screen antialiased">
         <ThemeProvider>
+          <RouteCurtain />
           {children}
           <ServiceWorkerRegister />
           <SpeedInsights />
