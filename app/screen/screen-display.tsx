@@ -5,9 +5,11 @@ import { ChatLayout } from "@/components/chat/chat-layout";
 export default function ScreenDisplay({
   userId,
   className,
+  cfWorkerUrl,
 }: {
   userId: string;
   className: string;
+  cfWorkerUrl: string | null;
 }) {
   return (
     <ChatLayout
@@ -15,7 +17,7 @@ export default function ScreenDisplay({
       userName={className}
       userRole="classroom"
       allowUrgent
-      cfWorkerUrl={process.env.NEXT_PUBLIC_CF_WORKER_URL ?? null}
+      cfWorkerUrl={cfWorkerUrl}
     />
   );
 }

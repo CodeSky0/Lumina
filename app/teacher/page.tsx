@@ -6,5 +6,12 @@ export default async function TeacherPage() {
   const session = await getCurrentSession();
   if (!session || session.user.role !== "teacher") redirect("/login");
 
-  return <TeacherPanel teacherId={session.user.id} teacherName={session.user.name} />;
+  const cfWorkerUrl = process.env.CF_WORKER_URL ?? null;
+  return (
+    <TeacherPanel
+      teacherId={session.user.id}
+      teacherName={session.user.name}
+      cfWorkerUrl={cfWorkerUrl}
+    />
+  );
 }

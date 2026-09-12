@@ -9,6 +9,7 @@ export default async function ScreenPage() {
 
   const screenClass = await getMyScreenClass();
   const className = screenClass?.className ?? "未绑定班级";
+  const cfWorkerUrl = process.env.CF_WORKER_URL ?? null;
 
-  return <ScreenDisplay userId={session.user.id} className={className} />;
+  return <ScreenDisplay userId={session.user.id} className={className} cfWorkerUrl={cfWorkerUrl} />;
 }

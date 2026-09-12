@@ -2,14 +2,14 @@
 
 import { ChatLayout } from "@/components/chat/chat-layout";
 
-export default function TeacherPanel({ teacherId, teacherName }: { teacherId: string; teacherName: string }) {
+export default function TeacherPanel({ teacherId, teacherName, cfWorkerUrl }: { teacherId: string; teacherName: string; cfWorkerUrl: string | null }) {
   return (
     <ChatLayout
       userId={teacherId}
       userName={teacherName}
       userRole="teacher"
       allowUrgent
-      cfWorkerUrl={process.env.NEXT_PUBLIC_CF_WORKER_URL ?? null}
+      cfWorkerUrl={cfWorkerUrl}
     />
   );
 }
