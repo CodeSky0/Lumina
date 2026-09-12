@@ -22,6 +22,69 @@
       "when": 1788960000000,
       "tag": "0002_chatroom_refactor",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788961000000,
+      "tag": "0003_message_reads",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788962000000,
+      "tag": "0004_message_recall_edit",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788963000000,
+      "tag": "0005_message_file_audio_types",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788964000000,
+      "tag": "0006_conversation_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788965000000,
+      "tag": "0007_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788966000000,
+      "tag": "0008_messages_mentions",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788967000000,
+      "tag": "0009_push_subscriptions",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788968000000,
+      "tag": "0010_announcements",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788969000000,
+      "tag": "0011_audit_logs",
+      "breakpoints": true
     }
   ]
 }
