@@ -1,25 +1,25 @@
 /**
- * prebuild 钩子 — 仅在 Vercel 部署构建（VERCEL=1）时自动同步数据库 schema，
+ * prebuild 钩子 — 仅在 Vercel 部署构建（VERCEL=1）时自动执行数据库迁移，
  * 本地 `npm run build` 跳过（避免无 DB 连接时失败）。
- * 本地如需同步请手动: npm run db:push
+ * 本地如需迁移请手动: node scripts/migrate.mjs
  *
- * 用 push 代替 migrate：直接对比 schema.ts 与数据库实际结构，补齐缺失的表/列，
- * 不会因"对象已存在"失败（比 migrate 更宽容，适合迁移历史不完整的情况）。
+ * 用编程式迁移（scripts/migrate.mjs）代替 drizzle-kit push/migrate：
+ * 逐语句容错执行，表/列已存在时忽略，不依赖 drizzle-kit 的交互式确认行为。
  */
 import { execSync } from "node:child_process";
 
 if (process.env.VERCEL === "1") {
-  console.log("▶ Vercel 构建：自动同步数据库 schema…");
+  console.log("▶ Vercel 构建：自动执行数据库迁移…");
   try {
-    execSync("drizzle-kit push", { stdio: "inherit" });
-    console.log("✓ 数据库 schema 同步完成");
+    execSync("node scripts/migrate.mjs", { stdio: "inherit" });
+    console.log("✓ 数据库迁移完成");
   } catch {
     console.error(
-      "⚠ 数据库 schema 同步失败，继续构建。请手动运行 npm run db:push 检查。",
+      "⚠ 数据库迁移失败，继续构建。请手动检查数据库状态。",
     );
   }
 } else {
   console.log(
-    "ℹ 非部署环境，跳过自动同步（手动执行: npm run db:push）",
+    "ℹ 非部署环境，跳过自动迁移（手动执行: node scripts/migrate.mjs）",
   );
 }
