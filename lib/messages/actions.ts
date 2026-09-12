@@ -14,6 +14,8 @@ import {
 import { toPublishPayload, toDirectPublishPayload } from "@/lib/realtime/contract";
 import { publishMessage } from "@/lib/realtime/publish";
 import { createNotification } from "@/lib/notifications/actions";
+import { rateLimit } from "@/lib/security/rate-limit";
+import { sanitizeAndTruncate, isFileSafe } from "@/lib/security/sanitize";
 import { z } from "zod";
 
 /* ------------------------------ 会话列表 ------------------------------ */
@@ -593,6 +595,9 @@ export async function sendMessage(
   if (!session) return { ok: false, error: "未登录" };
   const user = session.user;
 
+  const rl = rateLimit(`send:${user.id}`, 30, 60_000);
+  if (!rl.ok) return { ok: false, error: "发送过于频繁，请稍后再试" };
+
   const parsed = sendSchema.safeParse({
     conversationId: formData.get("conversationId"),
     text: formData.get("text") || undefined,
@@ -649,6 +654,9 @@ export async function sendMessage(
   let mimeType: string | null = null;
 
   if (file && file.size > 0) {
+    if (!isFileSafe(file.name, file.type)) {
+      return { ok: false, error: "不支持的文件类型" };
+    }
     const isImage = file.type.startsWith("image/");
     const isAudio = file.type.startsWith("audio/");
     if (isImage) {
@@ -671,11 +679,11 @@ export async function sendMessage(
       mimeType = upload.mimeType;
     }
   } else if (urgent) {
-    content = (text ?? "").trim();
+    content = sanitizeAndTruncate(text ?? "", 1000);
     if (!content) return { ok: false, error: "紧急消息不能为空" };
     type = "urgent";
   } else {
-    content = (text ?? "").trim();
+    content = sanitizeAndTruncate(text ?? "", 1000);
     if (!content) return { ok: false, error: "消息不能为空" };
     type = "text";
   }

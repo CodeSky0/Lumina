@@ -9,7 +9,7 @@ import { auth } from "@/lib/auth/server";
 import { requireUser } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db";
 import type { UserRole } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { createHash, randomBytes } from "node:crypto";
 import { headers } from "next/headers";
 import { z } from "zod";
@@ -409,37 +409,20 @@ export async function listClasses(): Promise<ClassListItem[]> {
       name: schema.classes.name,
       screenId: schema.classes.screenId,
       screenName: schema.users.name,
+      teacherCount: sql<number>`(SELECT count(*)::int FROM teacher_classes WHERE class_id = ${schema.classes.id})`,
+      studentCount: sql<number>`(SELECT count(*)::int FROM parent_students WHERE class_id = ${schema.classes.id})`,
     })
     .from(schema.classes)
     .leftJoin(schema.users, eq(schema.classes.screenId, schema.users.id))
     .orderBy(schema.classes.name);
 
-  const teacherCounts = await Promise.all(
-    rows.map((r) =>
-      db
-        .select({ id: schema.teacherClasses.teacherId })
-        .from(schema.teacherClasses)
-        .where(eq(schema.teacherClasses.classId, r.id))
-        .then((rows) => rows.length),
-    ),
-  );
-  const studentCounts = await Promise.all(
-    rows.map((r) =>
-      db
-        .select({ id: schema.parentStudents.id })
-        .from(schema.parentStudents)
-        .where(eq(schema.parentStudents.classId, r.id))
-        .then((rows) => rows.length),
-    ),
-  );
-
-  return rows.map((r, i) => ({
+  return rows.map((r) => ({
     id: r.id,
     name: r.name,
     screenId: r.screenId,
     screenName: r.screenName,
-    teacherCount: teacherCounts[i] ?? 0,
-    studentCount: studentCounts[i] ?? 0,
+    teacherCount: r.teacherCount ?? 0,
+    studentCount: r.studentCount ?? 0,
   }));
 }
 
