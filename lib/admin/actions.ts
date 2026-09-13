@@ -101,6 +101,7 @@ export async function createUser(
     tokenHash: sha256(token),
   };
   if (role === "teacher") {
+    await ensureSubjectsSchema();
     updateData.subjectId = subjectId ?? null;
   }
 
@@ -244,6 +245,7 @@ export async function batchCreateTeachers(
 ): Promise<BatchResultItem[]> {
   await requireUser("admin");
   const { items } = batchTeacherSchema.parse(input);
+  await ensureSubjectsSchema();
 
   const allClasses = await db
     .select({ id: schema.classes.id, name: schema.classes.name })
@@ -655,8 +657,30 @@ export type SubjectListItem = {
   teacherCount: number;
 };
 
+async function ensureSubjectsSchema(): Promise<void> {
+  try {
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS "subjects" (
+      "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      "name" text NOT NULL UNIQUE,
+      "slug" text NOT NULL UNIQUE,
+      "sort_order" integer NOT NULL DEFAULT 0,
+      "created_at" timestamptz NOT NULL DEFAULT now(),
+      "updated_at" timestamptz NOT NULL DEFAULT now()
+    )`);
+    await db.execute(sql`INSERT INTO "subjects" ("name", "slug", "sort_order") VALUES
+      ('语文', 'chinese', 0), ('数学', 'math', 1), ('英语', 'english', 2),
+      ('物理', 'physics', 3), ('化学', 'chemistry', 4), ('生物', 'biology', 5),
+      ('政治', 'politics', 6), ('历史', 'history', 7), ('地理', 'geography', 8)
+      ON CONFLICT DO NOTHING`);
+    await db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "subject_id" uuid REFERENCES "subjects"("id") ON DELETE SET NULL`);
+  } catch {
+    /* 忽略，查询时降级 */
+  }
+}
+
 export async function listSubjects(): Promise<SubjectListItem[]> {
   await requireUser("admin");
+  await ensureSubjectsSchema();
   try {
     const rows = await db
       .select({
@@ -673,7 +697,20 @@ export async function listSubjects(): Promise<SubjectListItem[]> {
       teacherCount: r.teacherCount ?? 0,
     }));
   } catch {
-    return [];
+    try {
+      const rows = await db
+        .select({
+          id: schema.subjects.id,
+          name: schema.subjects.name,
+          slug: schema.subjects.slug,
+          sortOrder: schema.subjects.sortOrder,
+        })
+        .from(schema.subjects)
+        .orderBy(schema.subjects.sortOrder);
+      return rows.map((r) => ({ ...r, teacherCount: 0 }));
+    } catch {
+      return [];
+    }
   }
 }
 
