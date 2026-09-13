@@ -119,7 +119,7 @@ export default function AboutPage() {
           transition={{ duration: 0.5, ease: EASE.out, delay: 0.24 }}
           className="text-center text-copy-13 text-neutral-5"
         >
-          © 2026 Lumina · 用 ♥ 编码
+          © 2026 Lumina · 用 ❤ 编码
         </motion.p>
       </div>
     </div>
