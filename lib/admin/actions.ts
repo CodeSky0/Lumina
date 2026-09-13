@@ -126,20 +126,34 @@ export type UserListItem = {
 
 export async function listUsers(): Promise<UserListItem[]> {
   await requireUser("admin");
-  const rows = await db
-    .select({
-      id: schema.users.id,
-      username: schema.users.username,
-      name: schema.users.name,
-      role: schema.users.role,
-      subjectId: schema.users.subjectId,
-      subjectName: schema.subjects.name,
-      createdAt: schema.users.createdAt,
-    })
-    .from(schema.users)
-    .leftJoin(schema.subjects, eq(schema.users.subjectId, schema.subjects.id))
-    .orderBy(schema.users.createdAt);
-  return rows;
+  try {
+    const rows = await db
+      .select({
+        id: schema.users.id,
+        username: schema.users.username,
+        name: schema.users.name,
+        role: schema.users.role,
+        subjectId: schema.users.subjectId,
+        subjectName: schema.subjects.name,
+        createdAt: schema.users.createdAt,
+      })
+      .from(schema.users)
+      .leftJoin(schema.subjects, eq(schema.users.subjectId, schema.subjects.id))
+      .orderBy(schema.users.createdAt);
+    return rows;
+  } catch {
+    const rows = await db
+      .select({
+        id: schema.users.id,
+        username: schema.users.username,
+        name: schema.users.name,
+        role: schema.users.role,
+        createdAt: schema.users.createdAt,
+      })
+      .from(schema.users)
+      .orderBy(schema.users.createdAt);
+    return rows.map((r) => ({ ...r, subjectId: null, subjectName: null }));
+  }
 }
 
 export async function deleteUser(userId: string): Promise<void> {
@@ -499,22 +513,39 @@ export async function listTeacherClassBindings(): Promise<
   TeacherClassBinding[]
 > {
   await requireUser("admin");
-  const rows = await db
-    .select({
-      teacherId: schema.teacherClasses.teacherId,
-      teacherName: schema.users.name,
-      classId: schema.teacherClasses.classId,
-      className: schema.classes.name,
-      subjectName: schema.subjects.name,
-    })
-    .from(schema.teacherClasses)
-    .innerJoin(schema.users, eq(schema.teacherClasses.teacherId, schema.users.id))
-    .innerJoin(
-      schema.classes,
-      eq(schema.teacherClasses.classId, schema.classes.id),
-    )
-    .leftJoin(schema.subjects, eq(schema.users.subjectId, schema.subjects.id));
-  return rows;
+  try {
+    const rows = await db
+      .select({
+        teacherId: schema.teacherClasses.teacherId,
+        teacherName: schema.users.name,
+        classId: schema.teacherClasses.classId,
+        className: schema.classes.name,
+        subjectName: schema.subjects.name,
+      })
+      .from(schema.teacherClasses)
+      .innerJoin(schema.users, eq(schema.teacherClasses.teacherId, schema.users.id))
+      .innerJoin(
+        schema.classes,
+        eq(schema.teacherClasses.classId, schema.classes.id),
+      )
+      .leftJoin(schema.subjects, eq(schema.users.subjectId, schema.subjects.id));
+    return rows;
+  } catch {
+    const rows = await db
+      .select({
+        teacherId: schema.teacherClasses.teacherId,
+        teacherName: schema.users.name,
+        classId: schema.teacherClasses.classId,
+        className: schema.classes.name,
+      })
+      .from(schema.teacherClasses)
+      .innerJoin(schema.users, eq(schema.teacherClasses.teacherId, schema.users.id))
+      .innerJoin(
+        schema.classes,
+        eq(schema.teacherClasses.classId, schema.classes.id),
+      );
+    return rows.map((r) => ({ ...r, subjectName: null }));
+  }
 }
 
 /* ------------------------------ 绑定：家长↔班级(学生) ------------------------------ */
@@ -626,20 +657,24 @@ export type SubjectListItem = {
 
 export async function listSubjects(): Promise<SubjectListItem[]> {
   await requireUser("admin");
-  const rows = await db
-    .select({
-      id: schema.subjects.id,
-      name: schema.subjects.name,
-      slug: schema.subjects.slug,
-      sortOrder: schema.subjects.sortOrder,
-      teacherCount: sql<number>`(SELECT count(*)::int FROM users WHERE subject_id = ${schema.subjects.id} AND role = 'teacher')`,
-    })
-    .from(schema.subjects)
-    .orderBy(schema.subjects.sortOrder);
-  return rows.map((r) => ({
-    ...r,
-    teacherCount: r.teacherCount ?? 0,
-  }));
+  try {
+    const rows = await db
+      .select({
+        id: schema.subjects.id,
+        name: schema.subjects.name,
+        slug: schema.subjects.slug,
+        sortOrder: schema.subjects.sortOrder,
+        teacherCount: sql<number>`(SELECT count(*)::int FROM users WHERE subject_id = ${schema.subjects.id} AND role = 'teacher')`,
+      })
+      .from(schema.subjects)
+      .orderBy(schema.subjects.sortOrder);
+    return rows.map((r) => ({
+      ...r,
+      teacherCount: r.teacherCount ?? 0,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 const createSubjectSchema = z.object({
