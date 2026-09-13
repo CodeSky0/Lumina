@@ -62,6 +62,7 @@ function sha256(s: string): string {
 const createUserSchema = z.object({
   role: z.enum(["parent", "teacher", "classroom", "admin"]),
   name: z.string().min(1).max(50),
+  subjectId: z.string().uuid().optional(),
 });
 
 export type CreatedUser = {
@@ -70,6 +71,7 @@ export type CreatedUser = {
   token: string;
   name: string;
   role: UserRole;
+  subjectId?: string | null;
 };
 
 /** 创建用户并生成唯一 ID/Token（Token 仅此次返回明文） */
@@ -77,7 +79,7 @@ export async function createUser(
   input: z.infer<typeof createUserSchema>,
 ): Promise<CreatedUser> {
   const admin = await requireUser("admin");
-  const { role, name } = createUserSchema.parse(input);
+  const { role, name, subjectId } = createUserSchema.parse(input);
 
   const username = await generateUniqueUsername(role);
   const token = generateToken();
@@ -94,14 +96,22 @@ export async function createUser(
   if (!res?.user) throw new Error("创建用户失败");
   const userId = res.user.id;
 
+  const updateData: { role: UserRole; tokenHash: string; subjectId?: string | null } = {
+    role,
+    tokenHash: sha256(token),
+  };
+  if (role === "teacher") {
+    updateData.subjectId = subjectId ?? null;
+  }
+
   await db
     .update(schema.users)
-    .set({ role, tokenHash: sha256(token) })
+    .set(updateData)
     .where(eq(schema.users.id, userId));
 
-  await writeAuditLog({ userId: admin.id, action: "create", targetType: "user", targetId: userId, detail: { role, name, username } });
+  await writeAuditLog({ userId: admin.id, action: "create", targetType: "user", targetId: userId, detail: { role, name, username, subjectId } });
 
-  return { id: userId, username, token, name, role };
+  return { id: userId, username, token, name, role, subjectId: subjectId ?? null };
 }
 
 export type UserListItem = {
@@ -109,6 +119,8 @@ export type UserListItem = {
   username: string;
   name: string;
   role: UserRole;
+  subjectId: string | null;
+  subjectName: string | null;
   createdAt: Date;
 };
 
@@ -120,9 +132,12 @@ export async function listUsers(): Promise<UserListItem[]> {
       username: schema.users.username,
       name: schema.users.name,
       role: schema.users.role,
+      subjectId: schema.users.subjectId,
+      subjectName: schema.subjects.name,
       createdAt: schema.users.createdAt,
     })
     .from(schema.users)
+    .leftJoin(schema.subjects, eq(schema.users.subjectId, schema.subjects.id))
     .orderBy(schema.users.createdAt);
   return rows;
 }
@@ -201,6 +216,7 @@ const batchTeacherSchema = z.object({
     .array(
       z.object({
         name: z.string().min(1).max(50),
+        subjectName: z.string().optional(),
         className: z.string().optional(),
       }),
     )
@@ -208,7 +224,7 @@ const batchTeacherSchema = z.object({
     .max(500),
 });
 
-/** 批量创建教师，可选绑定班级 */
+/** 批量创建教师，可选绑定学科与班级 */
 export async function batchCreateTeachers(
   input: z.infer<typeof batchTeacherSchema>,
 ): Promise<BatchResultItem[]> {
@@ -219,6 +235,11 @@ export async function batchCreateTeachers(
     .select({ id: schema.classes.id, name: schema.classes.name })
     .from(schema.classes);
   const classMap = new Map(allClasses.map((c) => [c.name, c.id]));
+
+  const allSubjects = await db
+    .select({ id: schema.subjects.id, name: schema.subjects.name })
+    .from(schema.subjects);
+  const subjectMap = new Map(allSubjects.map((s) => [s.name, s.id]));
 
   const results: BatchResultItem[] = [];
   for (const item of items) {
@@ -237,9 +258,10 @@ export async function batchCreateTeachers(
       if (!res?.user) throw new Error("创建失败");
       const userId = res.user.id;
 
+      const subjectId = item.subjectName ? (subjectMap.get(item.subjectName) ?? null) : null;
       await db
         .update(schema.users)
-        .set({ role: "teacher", tokenHash: sha256(token) })
+        .set({ role: "teacher", tokenHash: sha256(token), subjectId })
         .where(eq(schema.users.id, userId));
 
       if (item.className) {
@@ -470,6 +492,7 @@ export type TeacherClassBinding = {
   teacherName: string;
   classId: string;
   className: string;
+  subjectName: string | null;
 };
 
 export async function listTeacherClassBindings(): Promise<
@@ -482,13 +505,15 @@ export async function listTeacherClassBindings(): Promise<
       teacherName: schema.users.name,
       classId: schema.teacherClasses.classId,
       className: schema.classes.name,
+      subjectName: schema.subjects.name,
     })
     .from(schema.teacherClasses)
     .innerJoin(schema.users, eq(schema.teacherClasses.teacherId, schema.users.id))
     .innerJoin(
       schema.classes,
       eq(schema.teacherClasses.classId, schema.classes.id),
-    );
+    )
+    .leftJoin(schema.subjects, eq(schema.users.subjectId, schema.subjects.id));
   return rows;
 }
 
@@ -587,6 +612,102 @@ export async function unbindScreenClass(classId: string): Promise<void> {
     .update(schema.classes)
     .set({ screenId: null })
     .where(eq(schema.classes.id, classId));
+}
+
+/* ------------------------------ 学科管理 ------------------------------ */
+
+export type SubjectListItem = {
+  id: string;
+  name: string;
+  slug: string;
+  sortOrder: number;
+  teacherCount: number;
+};
+
+export async function listSubjects(): Promise<SubjectListItem[]> {
+  await requireUser("admin");
+  const rows = await db
+    .select({
+      id: schema.subjects.id,
+      name: schema.subjects.name,
+      slug: schema.subjects.slug,
+      sortOrder: schema.subjects.sortOrder,
+      teacherCount: sql<number>`(SELECT count(*)::int FROM users WHERE subject_id = ${schema.subjects.id} AND role = 'teacher')`,
+    })
+    .from(schema.subjects)
+    .orderBy(schema.subjects.sortOrder);
+  return rows.map((r) => ({
+    ...r,
+    teacherCount: r.teacherCount ?? 0,
+  }));
+}
+
+const createSubjectSchema = z.object({
+  name: z.string().min(1).max(20),
+  slug: z.string().min(1).max(30).regex(/^[a-z0-9-]+$/, "slug 只能包含小写字母、数字和连字符"),
+});
+
+export async function createSubject(
+  input: z.infer<typeof createSubjectSchema>,
+): Promise<{ id: string; name: string; slug: string }> {
+  const admin = await requireUser("admin");
+  const { name, slug } = createSubjectSchema.parse(input);
+  const maxOrder = await db
+    .select({ max: sql<number>`coalesce(max(sort_order), -1)::int` })
+    .from(schema.subjects);
+  const sortOrder = (maxOrder[0]?.max ?? -1) + 1;
+  const [row] = await db
+    .insert(schema.subjects)
+    .values({ name, slug, sortOrder })
+    .returning({ id: schema.subjects.id, name: schema.subjects.name, slug: schema.subjects.slug });
+  if (!row) throw new Error("创建学科失败");
+  await writeAuditLog({ userId: admin.id, action: "create", targetType: "subject", targetId: row.id, detail: { name, slug } });
+  return row;
+}
+
+const updateSubjectSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(20).optional(),
+  slug: z.string().min(1).max(30).regex(/^[a-z0-9-]+$/).optional(),
+});
+
+export async function updateSubject(
+  input: z.infer<typeof updateSubjectSchema>,
+): Promise<void> {
+  const admin = await requireUser("admin");
+  const { id, name, slug } = updateSubjectSchema.parse(input);
+  const updateData: { name?: string; slug?: string } = {};
+  if (name !== undefined) updateData.name = name;
+  if (slug !== undefined) updateData.slug = slug;
+  if (Object.keys(updateData).length === 0) return;
+  await db
+    .update(schema.subjects)
+    .set(updateData)
+    .where(eq(schema.subjects.id, id));
+  await writeAuditLog({ userId: admin.id, action: "update", targetType: "subject", targetId: id, detail: updateData });
+}
+
+export async function deleteSubject(subjectId: string): Promise<void> {
+  const admin = await requireUser("admin");
+  await db.delete(schema.subjects).where(eq(schema.subjects.id, subjectId));
+  await writeAuditLog({ userId: admin.id, action: "delete", targetType: "subject", targetId: subjectId });
+}
+
+const reorderSubjectsSchema = z.object({
+  items: z.array(z.object({ id: z.string().uuid(), sortOrder: z.number().int() })).min(1),
+});
+
+export async function reorderSubjects(
+  input: z.infer<typeof reorderSubjectsSchema>,
+): Promise<void> {
+  await requireUser("admin");
+  const { items } = reorderSubjectsSchema.parse(input);
+  for (const item of items) {
+    await db
+      .update(schema.subjects)
+      .set({ sortOrder: item.sortOrder })
+      .where(eq(schema.subjects.id, item.id));
+  }
 }
 
 /* ------------------------------ 引导：首个管理员 ------------------------------ */

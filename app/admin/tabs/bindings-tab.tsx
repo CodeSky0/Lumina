@@ -230,6 +230,9 @@ export function BindingsTab({
             >
               <span className="text-neutral-9">
                 <Badge tone="accent">{b.teacherName}</Badge>
+                {b.subjectName && (
+                  <Badge tone="neutral">{b.subjectName}</Badge>
+                )}
                 <span className="mx-2 text-neutral-6">→</span>
                 <Badge tone="neutral">{b.className}</Badge>
               </span>

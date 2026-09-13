@@ -21,6 +21,7 @@
 import {
   boolean,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -81,15 +82,46 @@ export const users = pgTable("users", {
   role: userRoleEnum("role").notNull().default("parent"),
   /** 登录 Token 的 SHA-256 哈希（审计/自定义校验冗余；密码主校验由 better-auth accounts.password 承担） */
   tokenHash: text("token_hash").notNull().default(""),
+  /** 教师所属学科（仅 role='teacher' 时使用；删除学科时置 null） */
+  subjectId: uuid("subject_id").references(() => subjects.id, {
+    onDelete: "set null",
+  }),
 });
 
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
+  subject: one(subjects, {
+    fields: [users.subjectId],
+    references: [subjects.id],
+  }),
   teachingClasses: many(teacherClasses),
   children: many(parentStudents),
   sentMessages: many(messages),
   classroomFor: many(classes),
   accounts: many(accounts),
   sessions: many(sessions),
+}));
+
+/* -------------------------------------------------------------------------- */
+/* subjects — 学科（可配置，初始预置 9 科）                                      */
+/* -------------------------------------------------------------------------- */
+
+export const subjects = pgTable("subjects", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  /** 学科名称，如"语文""数学" */
+  name: text("name").notNull().unique(),
+  /** 程序引用标识，如"chinese""math" */
+  slug: text("slug").notNull().unique(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const subjectsRelations = relations(subjects, ({ many }) => ({
+  teachers: many(users),
 }));
 
 /* -------------------------------------------------------------------------- */
@@ -599,6 +631,8 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type Subject = typeof subjects.$inferSelect;
+export type NewSubject = typeof subjects.$inferInsert;
 export type Class = typeof classes.$inferSelect;
 export type NewClass = typeof classes.$inferInsert;
 export type TeacherClass = typeof teacherClasses.$inferSelect;

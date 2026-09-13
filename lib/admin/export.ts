@@ -23,9 +23,11 @@ export async function exportUsersCSV(): Promise<string | null> {
       username: schema.users.username,
       name: schema.users.name,
       role: schema.users.role,
+      subjectName: schema.subjects.name,
       createdAt: schema.users.createdAt,
     })
     .from(schema.users)
+    .leftJoin(schema.subjects, eq(schema.users.subjectId, schema.subjects.id))
     .orderBy(desc(schema.users.createdAt));
 
   const roleLabels: Record<string, string> = {
@@ -36,11 +38,12 @@ export async function exportUsersCSV(): Promise<string | null> {
   };
 
   return toCSV(
-    ["登录ID", "姓名", "角色", "创建时间"],
+    ["登录ID", "姓名", "角色", "学科", "创建时间"],
     rows.map((r) => [
       r.username,
       r.name,
       roleLabels[r.role] ?? r.role,
+      r.subjectName ?? "",
       r.createdAt.toISOString(),
     ]),
   );
@@ -54,11 +57,13 @@ export async function exportBindingsCSV(): Promise<string | null> {
     .select({
       teacherName: schema.users.name,
       teacherUsername: schema.users.username,
+      subjectName: schema.subjects.name,
       className: schema.classes.name,
     })
     .from(schema.teacherClasses)
     .innerJoin(schema.users, eq(schema.teacherClasses.teacherId, schema.users.id))
-    .innerJoin(schema.classes, eq(schema.teacherClasses.classId, schema.classes.id));
+    .innerJoin(schema.classes, eq(schema.teacherClasses.classId, schema.classes.id))
+    .leftJoin(schema.subjects, eq(schema.users.subjectId, schema.subjects.id));
 
   const parentBindings = await db
     .select({
@@ -75,6 +80,7 @@ export async function exportBindingsCSV(): Promise<string | null> {
     "教师",
     r.teacherUsername,
     r.teacherName,
+    r.subjectName ?? "",
     r.className,
     "",
   ]);
@@ -82,12 +88,13 @@ export async function exportBindingsCSV(): Promise<string | null> {
     "家长",
     r.parentUsername,
     r.parentName,
+    "",
     r.className,
     r.studentName,
   ]);
 
   return toCSV(
-    ["角色", "登录ID", "姓名", "班级", "学生姓名"],
+    ["角色", "登录ID", "姓名", "学科", "班级", "学生姓名"],
     [...teacherRows, ...parentRows],
   );
 }

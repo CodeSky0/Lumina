@@ -17,6 +17,7 @@ import {
   type BatchResultItem,
   type ClassListItem,
   type CreatedUser,
+  type SubjectListItem,
   type UserListItem,
 } from "@/lib/admin/actions";
 import { TokenDisplay } from "../components/token-display";
@@ -40,15 +41,18 @@ const ROLE_BADGE_TONE: Record<string, "neutral" | "accent" | "success" | "error"
 
 interface UsersTabProps {
   users: UserListItem[];
+  subjects: SubjectListItem[];
   classes: ClassListItem[];
   onRefresh: () => Promise<void>;
 }
 
-export function UsersTab({ users, onRefresh }: UsersTabProps) {
+export function UsersTab({ users, subjects, onRefresh }: UsersTabProps) {
   const [pending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("");
+  const [subjectFilter, setSubjectFilter] = useState<string>("");
   const [showCreate, setShowCreate] = useState(false);
+  const [createRole, setCreateRole] = useState<string>("");
   const [created, setCreated] = useState<CreatedUser | null>(null);
   const [tokenMode, setTokenMode] = useState<"create" | "reset">("create");
   const [deleteTarget, setDeleteTarget] = useState<UserListItem | null>(null);
@@ -57,6 +61,8 @@ export function UsersTab({ users, onRefresh }: UsersTabProps) {
   const [batchResults, setBatchResults] = useState<BatchResultItem[] | null>(null);
   const { show } = useToast();
 
+  const subjectOptions = subjects.map((s) => ({ value: s.id, label: s.name }));
+
   const filtered = useMemo(() => {
     return users.filter((u) => {
       const matchSearch =
@@ -64,22 +70,30 @@ export function UsersTab({ users, onRefresh }: UsersTabProps) {
         u.name.toLowerCase().includes(search.toLowerCase()) ||
         u.username.toLowerCase().includes(search.toLowerCase());
       const matchRole = !roleFilter || u.role === roleFilter;
-      return matchSearch && matchRole;
+      const matchSubject =
+        !subjectFilter ||
+        (roleFilter === "teacher" && u.subjectId === subjectFilter) ||
+        (subjectFilter === "none" && u.role === "teacher" && !u.subjectId);
+      return matchSearch && matchRole && matchSubject;
     });
-  }, [users, search, roleFilter]);
+  }, [users, search, roleFilter, subjectFilter]);
 
   function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
+    const role = String(f.get("role")) as CreatedUser["role"];
     startTransition(async () => {
       try {
+        const subjectId = role === "teacher" ? String(f.get("subjectId") || "") : "";
         const res = await createUser({
-          role: String(f.get("role")) as CreatedUser["role"],
+          role,
           name: String(f.get("name")),
+          ...(subjectId ? { subjectId } : {}),
         });
         setCreated(res);
         setTokenMode("create");
         setShowCreate(false);
+        setCreateRole("");
         await onRefresh();
         show("success", "用户创建成功");
       } catch (e) {
@@ -160,9 +174,24 @@ export function UsersTab({ users, onRefresh }: UsersTabProps) {
             { value: "admin", label: "管理员" },
           ]}
           value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
+          onChange={(e) => {
+            setRoleFilter(e.target.value);
+            setSubjectFilter("");
+          }}
           className="w-32"
         />
+        {roleFilter === "teacher" && (
+          <Select
+            placeholder="全部学科"
+            options={[
+              ...subjectOptions,
+              { value: "none", label: "未分配学科" },
+            ]}
+            value={subjectFilter}
+            onChange={(e) => setSubjectFilter(e.target.value)}
+            className="w-32"
+          />
+        )}
       </div>
 
       <Card className="p-0">
@@ -172,6 +201,7 @@ export function UsersTab({ users, onRefresh }: UsersTabProps) {
               <tr className="border-b border-border text-label-12 text-neutral-7">
                 <th className="px-4 py-3 text-left font-medium">姓名</th>
                 <th className="px-4 py-3 text-left font-medium">角色</th>
+                <th className="px-4 py-3 text-left font-medium">学科</th>
                 <th className="px-4 py-3 text-left font-medium">登录 ID</th>
                 <th className="px-4 py-3 text-left font-medium">创建时间</th>
                 <th className="px-4 py-3 text-right font-medium">操作</th>
@@ -180,7 +210,7 @@ export function UsersTab({ users, onRefresh }: UsersTabProps) {
             <tbody>
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-neutral-6">
+                  <td colSpan={6} className="px-4 py-8 text-center text-neutral-6">
                     无匹配用户
                   </td>
                 </tr>
@@ -195,6 +225,13 @@ export function UsersTab({ users, onRefresh }: UsersTabProps) {
                     <Badge tone={ROLE_BADGE_TONE[u.role]}>
                       {ROLE_LABELS[u.role]}
                     </Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    {u.role === "teacher" && u.subjectName ? (
+                      <Badge tone="neutral">{u.subjectName}</Badge>
+                    ) : (
+                      <span className="text-label-12 text-neutral-5">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <code className="font-mono text-label-12 text-neutral-7">
@@ -241,9 +278,19 @@ export function UsersTab({ users, onRefresh }: UsersTabProps) {
               { value: "classroom", label: "大屏" },
               { value: "admin", label: "管理员" },
             ]}
+            value={createRole}
+            onChange={(e) => setCreateRole(e.target.value)}
             required
           />
           <Input name="name" label="姓名" required />
+          {createRole === "teacher" && (
+            <Select
+              name="subjectId"
+              label="学科"
+              placeholder="选择学科（可选）"
+              options={subjectOptions}
+            />
+          )}
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="secondary" onClick={() => setShowCreate(false)}>
               取消

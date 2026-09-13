@@ -6,10 +6,12 @@ import { authClient } from "@/lib/auth/client";
 import {
   listClasses,
   listParentStudentBindings,
+  listSubjects,
   listTeacherClassBindings,
   listUsers,
   type ClassListItem,
   type ParentStudentBinding,
+  type SubjectListItem,
   type TeacherClassBinding,
   type UserListItem,
 } from "@/lib/admin/actions";
@@ -17,6 +19,7 @@ import { ToastProvider } from "@/components/ui";
 import { AdminSidebar, type AdminTab } from "./components/admin-sidebar";
 import { DashboardTab } from "./tabs/dashboard-tab";
 import { UsersTab } from "./tabs/users-tab";
+import { SubjectsTab } from "./tabs/subjects-tab";
 import { ClassesTab } from "./tabs/classes-tab";
 import { BindingsTab } from "./tabs/bindings-tab";
 import { AuditTab } from "./tabs/audit-tab";
@@ -28,6 +31,7 @@ interface AdminPanelProps {
 export default function AdminPanel({ adminName }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
   const [users, setUsers] = useState<UserListItem[]>([]);
+  const [subjects, setSubjects] = useState<SubjectListItem[]>([]);
   const [classes, setClasses] = useState<ClassListItem[]>([]);
   const [teacherBindings, setTeacherBindings] = useState<TeacherClassBinding[]>(
     [],
@@ -37,13 +41,15 @@ export default function AdminPanel({ adminName }: AdminPanelProps) {
   );
 
   async function refresh() {
-    const [u, c, tb, pb] = await Promise.all([
+    const [u, s, c, tb, pb] = await Promise.all([
       listUsers(),
+      listSubjects(),
       listClasses(),
       listTeacherClassBindings(),
       listParentStudentBindings(),
     ]);
     setUsers(u);
+    setSubjects(s);
     setClasses(c);
     setTeacherBindings(tb);
     setParentBindings(pb);
@@ -73,7 +79,10 @@ export default function AdminPanel({ adminName }: AdminPanelProps) {
             >
               {activeTab === "dashboard" && <DashboardTab />}
               {activeTab === "users" && (
-                <UsersTab users={users} classes={classes} onRefresh={refresh} />
+                <UsersTab users={users} subjects={subjects} classes={classes} onRefresh={refresh} />
+              )}
+              {activeTab === "subjects" && (
+                <SubjectsTab subjects={subjects} onRefresh={refresh} />
               )}
               {activeTab === "classes" && (
                 <ClassesTab classes={classes} onRefresh={refresh} />
