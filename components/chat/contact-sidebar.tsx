@@ -1,6 +1,7 @@
 "use client";
 
 import { LayoutGroup, motion } from "motion/react";
+import Link from "next/link";
 import type { ConversationItem } from "@/lib/messages/actions";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { PushSubscribe } from "@/components/push-subscribe";
@@ -104,6 +105,18 @@ export function ContactSidebar({
           <NotificationBell />
           <PushSubscribe />
           <ThemeToggle />
+          <Link
+            href="/about"
+            title="关于"
+            className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-copy-13 text-neutral-6 transition-colors hover:bg-neutral-2 hover:text-neutral-9"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4" />
+              <path d="M12 8h.01" />
+            </svg>
+            <span>关于</span>
+          </Link>
         </div>
         <span className="text-caption-10 text-neutral-5">Lumina 流光</span>
       </div>
