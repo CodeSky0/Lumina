@@ -18,7 +18,7 @@ interface BatchImportDialogProps {
   onComplete: (results: BatchResultItem[]) => void;
 }
 
-const TEACHER_PLACEHOLDER = "姓名,学科,班级名\n张老师,语文,一年级一班\n李老师,数学,一年级一班\n王老师,英语,二年级一班";
+const TEACHER_PLACEHOLDER = "姓名,学科,班级名,是否班主任\n张老师,语文,一年级一班,是\n李老师,数学,一年级一班\n王老师,英语,二年级一班";
 
 const STUDENT_PLACEHOLDER =
   "学生姓名,家长姓名,班级名\n小明,张三,一年级一班\n小红,张三,一年级一班\n小华,李四,二年级一班";
@@ -58,6 +58,7 @@ export function BatchImportDialog({
             姓名: parts[0] ?? "",
             学科: parts[1] ?? "",
             班级名: parts[2] ?? "",
+            是否班主任: parts[3] ?? "",
           });
         }
       } else {
@@ -114,6 +115,7 @@ export function BatchImportDialog({
             name: r["姓名"] ?? "",
             subjectName: r["学科"] || undefined,
             className: r["班级名"] || undefined,
+            isHeadTeacher: r["是否班主任"] === "是" || r["是否班主任"] === "true" || r["是否班主任"] === "1",
           })),
         });
       } else {
@@ -152,7 +154,7 @@ export function BatchImportDialog({
           <div className="flex items-center justify-between">
             <span className="text-label-12 font-medium text-neutral-7">
               {mode === "teacher"
-                ? "每行：姓名,学科,班级名（学科、班级名可选）"
+                ? "每行：姓名,学科,班级名,是否班主任（学科、班级名、是否班主任可选；是否班主任填\"是\"）"
                 : "每行：学生姓名,家长姓名,班级名"}
             </span>
             <label className="cursor-pointer text-label-12 text-accent underline">

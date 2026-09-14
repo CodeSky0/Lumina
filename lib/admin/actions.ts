@@ -63,6 +63,8 @@ const createUserSchema = z.object({
   role: z.enum(["parent", "teacher", "classroom", "admin"]),
   name: z.string().min(1).max(50),
   subjectId: z.string().uuid().optional(),
+  classId: z.string().uuid().optional(),
+  isHeadTeacher: z.boolean().optional(),
 });
 
 export type CreatedUser = {
@@ -79,7 +81,7 @@ export async function createUser(
   input: z.infer<typeof createUserSchema>,
 ): Promise<CreatedUser> {
   const admin = await requireUser("admin");
-  const { role, name, subjectId } = createUserSchema.parse(input);
+  const { role, name, subjectId, classId, isHeadTeacher } = createUserSchema.parse(input);
 
   const username = await generateUniqueUsername(role);
   const token = generateToken();
@@ -110,7 +112,24 @@ export async function createUser(
     .set(updateData)
     .where(eq(schema.users.id, userId));
 
-  await writeAuditLog({ userId: admin.id, action: "create", targetType: "user", targetId: userId, detail: { role, name, username, subjectId } });
+  if (role === "teacher" && classId) {
+    await ensureHeadTeacherSchema();
+    if (isHeadTeacher) {
+      await db
+        .update(schema.teacherClasses)
+        .set({ isHeadTeacher: false })
+        .where(eq(schema.teacherClasses.classId, classId));
+    }
+    await db
+      .insert(schema.teacherClasses)
+      .values({ teacherId: userId, classId, isHeadTeacher: isHeadTeacher ?? false })
+      .onConflictDoUpdate({
+        target: [schema.teacherClasses.teacherId, schema.teacherClasses.classId],
+        set: { isHeadTeacher: isHeadTeacher ?? false },
+      });
+  }
+
+  await writeAuditLog({ userId: admin.id, action: "create", targetType: "user", targetId: userId, detail: { role, name, username, subjectId, classId, isHeadTeacher } });
 
   return { id: userId, username, token, name, role, subjectId: subjectId ?? null };
 }
@@ -233,6 +252,7 @@ const batchTeacherSchema = z.object({
         name: z.string().min(1).max(50),
         subjectName: z.string().optional(),
         className: z.string().optional(),
+        isHeadTeacher: z.boolean().optional(),
       }),
     )
     .min(1)
@@ -283,10 +303,19 @@ export async function batchCreateTeachers(
       if (item.className) {
         const classId = classMap.get(item.className);
         if (classId) {
+          if (item.isHeadTeacher) {
+            await db
+              .update(schema.teacherClasses)
+              .set({ isHeadTeacher: false })
+              .where(eq(schema.teacherClasses.classId, classId));
+          }
           await db
             .insert(schema.teacherClasses)
-            .values({ teacherId: userId, classId })
-            .onConflictDoNothing();
+            .values({ teacherId: userId, classId, isHeadTeacher: item.isHeadTeacher ?? false })
+            .onConflictDoUpdate({
+              target: [schema.teacherClasses.teacherId, schema.teacherClasses.classId],
+              set: { isHeadTeacher: item.isHeadTeacher ?? false },
+            });
         }
       }
 
@@ -475,24 +504,35 @@ export async function deleteClass(classId: string): Promise<void> {
 const bindTeacherSchema = z.object({
   teacherId: z.string().min(1),
   classId: z.string().min(1),
+  isHeadTeacher: z.boolean().default(false),
 });
 
 export async function bindTeacherClass(
   input: z.infer<typeof bindTeacherSchema>,
 ): Promise<void> {
   await requireUser("admin");
-  const { teacherId, classId } = bindTeacherSchema.parse(input);
+  const { teacherId, classId, isHeadTeacher } = bindTeacherSchema.parse(input);
+  await ensureHeadTeacherSchema();
+  if (isHeadTeacher) {
+    await db
+      .update(schema.teacherClasses)
+      .set({ isHeadTeacher: false })
+      .where(eq(schema.teacherClasses.classId, classId));
+  }
   await db
     .insert(schema.teacherClasses)
-    .values({ teacherId, classId })
-    .onConflictDoNothing();
+    .values({ teacherId, classId, isHeadTeacher })
+    .onConflictDoUpdate({
+      target: [schema.teacherClasses.teacherId, schema.teacherClasses.classId],
+      set: { isHeadTeacher },
+    });
 }
 
 export async function unbindTeacherClass(
-  input: z.infer<typeof bindTeacherSchema>,
+  input: { teacherId: string; classId: string },
 ): Promise<void> {
   await requireUser("admin");
-  const { teacherId, classId } = bindTeacherSchema.parse(input);
+  const { teacherId, classId } = input;
   await db
     .delete(schema.teacherClasses)
     .where(
@@ -509,12 +549,14 @@ export type TeacherClassBinding = {
   classId: string;
   className: string;
   subjectName: string | null;
+  isHeadTeacher: boolean;
 };
 
 export async function listTeacherClassBindings(): Promise<
   TeacherClassBinding[]
 > {
   await requireUser("admin");
+  await ensureHeadTeacherSchema();
   try {
     const rows = await db
       .select({
@@ -523,6 +565,7 @@ export async function listTeacherClassBindings(): Promise<
         classId: schema.teacherClasses.classId,
         className: schema.classes.name,
         subjectName: schema.subjects.name,
+        isHeadTeacher: schema.teacherClasses.isHeadTeacher,
       })
       .from(schema.teacherClasses)
       .innerJoin(schema.users, eq(schema.teacherClasses.teacherId, schema.users.id))
@@ -546,7 +589,7 @@ export async function listTeacherClassBindings(): Promise<
         schema.classes,
         eq(schema.teacherClasses.classId, schema.classes.id),
       );
-    return rows.map((r) => ({ ...r, subjectName: null }));
+    return rows.map((r) => ({ ...r, subjectName: null, isHeadTeacher: false }));
   }
 }
 
@@ -673,6 +716,15 @@ async function ensureSubjectsSchema(): Promise<void> {
       ('政治', 'politics', 6), ('历史', 'history', 7), ('地理', 'geography', 8)
       ON CONFLICT DO NOTHING`);
     await db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "subject_id" uuid REFERENCES "subjects"("id") ON DELETE SET NULL`);
+  } catch {
+    /* 忽略，查询时降级 */
+  }
+}
+
+async function ensureHeadTeacherSchema(): Promise<void> {
+  try {
+    await db.execute(sql`ALTER TABLE "teacher_classes" ADD COLUMN IF NOT EXISTS "is_head_teacher" boolean NOT NULL DEFAULT false`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "teacher_classes_head_unique" ON "teacher_classes" ("class_id") WHERE "is_head_teacher" = true`);
   } catch {
     /* 忽略，查询时降级 */
   }

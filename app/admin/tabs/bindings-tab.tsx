@@ -113,6 +113,7 @@ export function BindingsTab({
         await bindTeacherClass({
           teacherId: String(f.get("teacherId")),
           classId: String(f.get("classId")),
+          isHeadTeacher: f.get("isHeadTeacher") === "on",
         });
         form.reset();
         await onRefresh();
@@ -214,6 +215,14 @@ export function BindingsTab({
             options={classOptions}
             required
           />
+          <label className="flex items-center gap-1 text-copy-14 text-neutral-9">
+            <input
+              type="checkbox"
+              name="isHeadTeacher"
+              className="h-4 w-4 rounded border-border accent-accent"
+            />
+            班主任
+          </label>
           <Button type="submit" disabled={pending}>
             绑定
           </Button>
@@ -230,6 +239,9 @@ export function BindingsTab({
             >
               <span className="text-neutral-9">
                 <Badge tone="accent">{b.teacherName}</Badge>
+                {b.isHeadTeacher && (
+                  <Badge tone="success">班主任</Badge>
+                )}
                 {b.subjectName && (
                   <Badge tone="neutral">{b.subjectName}</Badge>
                 )}

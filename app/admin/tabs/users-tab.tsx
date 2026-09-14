@@ -46,13 +46,14 @@ interface UsersTabProps {
   onRefresh: () => Promise<void>;
 }
 
-export function UsersTab({ users, subjects, onRefresh }: UsersTabProps) {
+export function UsersTab({ users, subjects, classes, onRefresh }: UsersTabProps) {
   const [pending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("");
   const [subjectFilter, setSubjectFilter] = useState<string>("");
   const [showCreate, setShowCreate] = useState(false);
   const [createRole, setCreateRole] = useState<string>("");
+  const [createClassId, setCreateClassId] = useState<string>("");
   const [created, setCreated] = useState<CreatedUser | null>(null);
   const [tokenMode, setTokenMode] = useState<"create" | "reset">("create");
   const [deleteTarget, setDeleteTarget] = useState<UserListItem | null>(null);
@@ -62,6 +63,7 @@ export function UsersTab({ users, subjects, onRefresh }: UsersTabProps) {
   const { show } = useToast();
 
   const subjectOptions = subjects.map((s) => ({ value: s.id, label: s.name }));
+  const classOptions = classes.map((c) => ({ value: c.id, label: c.name }));
 
   const filtered = useMemo(() => {
     return users.filter((u) => {
@@ -85,15 +87,19 @@ export function UsersTab({ users, subjects, onRefresh }: UsersTabProps) {
     startTransition(async () => {
       try {
         const subjectId = role === "teacher" ? String(f.get("subjectId") || "") : "";
+        const classId = role === "teacher" ? String(f.get("classId") || "") : "";
+        const isHeadTeacher = role === "teacher" && !!classId && f.get("isHeadTeacher") === "on";
         const res = await createUser({
           role,
           name: String(f.get("name")),
           ...(subjectId ? { subjectId } : {}),
+          ...(classId ? { classId, isHeadTeacher } : {}),
         });
         setCreated(res);
         setTokenMode("create");
         setShowCreate(false);
         setCreateRole("");
+        setCreateClassId("");
         await onRefresh();
         show("success", "用户创建成功");
       } catch (e) {
@@ -290,6 +296,26 @@ export function UsersTab({ users, subjects, onRefresh }: UsersTabProps) {
               placeholder="选择学科（可选）"
               options={subjectOptions}
             />
+          )}
+          {createRole === "teacher" && (
+            <Select
+              name="classId"
+              label="班级（可选）"
+              placeholder="不绑定班级"
+              options={classOptions}
+              value={createClassId}
+              onChange={(e) => setCreateClassId(e.target.value)}
+            />
+          )}
+          {createRole === "teacher" && createClassId && (
+            <label className="flex items-center gap-2 text-copy-14 text-neutral-9">
+              <input
+                type="checkbox"
+                name="isHeadTeacher"
+                className="h-4 w-4 rounded border-border accent-accent"
+              />
+              设为该班班主任
+            </label>
           )}
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="secondary" onClick={() => setShowCreate(false)}>

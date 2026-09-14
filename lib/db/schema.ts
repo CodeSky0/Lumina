@@ -31,7 +31,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 /* -------------------------------------------------------------------------- */
 /* 枚举                                                                        */
@@ -301,11 +301,18 @@ export const teacherClasses = pgTable(
     classId: uuid("class_id")
       .notNull()
       .references(() => classes.id, { onDelete: "cascade" }),
+    /** 是否为该班班主任（一个班至多一个班主任，由部分唯一索引保证） */
+    isHeadTeacher: boolean("is_head_teacher").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
   },
-  (t) => [primaryKey({ columns: [t.teacherId, t.classId] })],
+  (t) => [
+    primaryKey({ columns: [t.teacherId, t.classId] }),
+    uniqueIndex("teacher_classes_head_unique")
+      .on(t.classId)
+      .where(sql`${t.isHeadTeacher} = true`),
+  ],
 );
 
 export const teacherClassesRelations = relations(teacherClasses, ({ one }) => ({

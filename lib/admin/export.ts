@@ -59,6 +59,7 @@ export async function exportBindingsCSV(): Promise<string | null> {
       teacherUsername: schema.users.username,
       subjectName: schema.subjects.name,
       className: schema.classes.name,
+      isHeadTeacher: schema.teacherClasses.isHeadTeacher,
     })
     .from(schema.teacherClasses)
     .innerJoin(schema.users, eq(schema.teacherClasses.teacherId, schema.users.id))
@@ -82,6 +83,7 @@ export async function exportBindingsCSV(): Promise<string | null> {
     r.teacherName,
     r.subjectName ?? "",
     r.className,
+    r.isHeadTeacher ? "是" : "",
     "",
   ]);
   const parentRows = parentBindings.map((r) => [
@@ -90,11 +92,12 @@ export async function exportBindingsCSV(): Promise<string | null> {
     r.parentName,
     "",
     r.className,
+    "",
     r.studentName,
   ]);
 
   return toCSV(
-    ["角色", "登录ID", "姓名", "学科", "班级", "学生姓名"],
+    ["角色", "登录ID", "姓名", "学科", "班级", "班主任", "学生姓名"],
     [...teacherRows, ...parentRows],
   );
 }
