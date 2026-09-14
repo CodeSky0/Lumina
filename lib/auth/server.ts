@@ -30,6 +30,17 @@ export const auth = betterAuth({
     enabled: true,
     autoSignIn: false,
   },
+  session: {
+    /** Session 30 天过期，同一设备浏览器关闭后仍保持登录 */
+    expiresIn: 60 * 60 * 24 * 30,
+    /** 每 7 天自动续期，活跃用户无需重新登录 */
+    updateAge: 60 * 60 * 24 * 7,
+    /** Cookie 缓存 5 分钟，减少 DB 查询 */
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60,
+    },
+  },
   plugins: [
     username({
       /** 允许短码字符：字母数字与连字符 */
