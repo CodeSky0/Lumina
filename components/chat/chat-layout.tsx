@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import {
   ContactSidebar,
@@ -14,6 +14,8 @@ import {
   getMyConversations,
   getConversationMessages,
   markConversationRead,
+  markMessageDelivered,
+  markMessageRead,
   type ConversationItem,
   type ClassMessage,
 } from "@/lib/messages/actions";
@@ -40,6 +42,7 @@ export function ChatLayout({
   const [messages, setMessages] = useState<ClassMessage[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [searching, setSearching] = useState(false);
+  const reportedRef = useRef(new Set<string>());
 
   useEffect(() => {
     void getMyConversations().then((cs) => {
@@ -73,6 +76,13 @@ export function ChatLayout({
   const { messages: wsMessages, connected, presence } = useChatWs(
     wsUrl,
     { userId, name: userName, role: userRole as "parent" | "teacher" | "classroom" | "admin" },
+    (update) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === update.messageId ? { ...m, status: update.status } : m,
+        ),
+      );
+    },
   );
 
   useEffect(() => {
@@ -125,7 +135,7 @@ export function ChatLayout({
           content: m.content,
           type: m.type,
           mimeType: m.mimeType,
-          status: "displayed",
+          status: m.senderId === userId ? "pending" : "delivered",
           deletedAt: null,
           editedAt: null,
           editHistory: null,
@@ -136,6 +146,31 @@ export function ChatLayout({
       return [...prev, ...newMsgs];
     });
   }, [wsMessages]);
+
+  useEffect(() => {
+    reportedRef.current.clear();
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const convType = selected.type;
+    for (const msg of messages) {
+      if (reportedRef.current.has(msg.id)) continue;
+      if (msg.senderId === userId) continue;
+      const shouldReport =
+        convType === "direct" ||
+        (convType === "group" && userRole === "classroom" && msg.senderRole === "teacher");
+      if (!shouldReport) continue;
+      reportedRef.current.add(msg.id);
+      if (msg.status === "displayed") continue;
+      if (msg.status === "pending") {
+        void markMessageDelivered(msg.id).catch(() => {});
+      }
+      setTimeout(() => {
+        void markMessageRead(msg.id).catch(() => {});
+      }, 5000);
+    }
+  }, [messages, selected, userId, userRole]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-neutral-1">

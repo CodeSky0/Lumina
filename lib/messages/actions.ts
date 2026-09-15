@@ -11,8 +11,8 @@ import {
   getClassroomClassId,
   ForbiddenError,
 } from "@/lib/rbac";
-import { toPublishPayload, toDirectPublishPayload } from "@/lib/realtime/contract";
-import { publishMessage } from "@/lib/realtime/publish";
+import { toPublishPayload, toDirectPublishPayload, toStatusPublishPayload, toDirectStatusPublishPayload } from "@/lib/realtime/contract";
+import { publishMessage, publishMessageStatus } from "@/lib/realtime/publish";
 import { createNotification } from "@/lib/notifications/actions";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { sanitizeAndTruncate, isFileSafe } from "@/lib/security/sanitize";
@@ -700,7 +700,7 @@ export async function sendMessage(
       content,
       type,
       mimeType,
-      status: "delivered",
+      status: "pending",
       mentions: parsedMentions.length > 0 ? parsedMentions : null,
     })
     .returning();
@@ -756,7 +756,7 @@ export async function sendMessage(
     );
   }
 
-  return { ok: true, id: msg.id, status: "delivered" };
+  return { ok: true, id: msg.id, status: "pending" };
 }
 
 /* ------------------------------ 查询消息 ------------------------------ */
@@ -799,17 +799,6 @@ export async function getConversationMessages(
     return [];
   }
 
-  await db
-    .update(schema.messages)
-    .set({ status: "displayed" })
-    .where(
-      and(
-        eq(schema.messages.conversationId, conversationId),
-        ne(schema.messages.senderId, user.id),
-        eq(schema.messages.status, "delivered"),
-      ),
-    );
-
   const whereCondition = beforeCursor
     ? and(
         eq(schema.messages.conversationId, conversationId),
@@ -839,6 +828,140 @@ export async function getConversationMessages(
     .orderBy(desc(schema.messages.createdAt))
     .limit(50);
   return rows;
+}
+
+/* ------------------------------ 消息状态上报 ------------------------------ */
+
+async function publishStatusEvent(
+  conversation: { type: ConversationType; classId: string | null; participantAId: string | null; participantBId: string | null },
+  messageId: string,
+  status: "delivered" | "displayed",
+  reader: { id: string; role: UserRole },
+): Promise<void> {
+  if (conversation.type === "group" && conversation.classId) {
+    await publishMessageStatus(
+      toStatusPublishPayload({
+        classId: conversation.classId,
+        messageId,
+        status,
+        readerId: reader.id,
+        readerRole: reader.role,
+      }),
+    );
+  } else if (
+    conversation.type === "direct" &&
+    conversation.participantAId &&
+    conversation.participantBId
+  ) {
+    await publishMessageStatus(
+      toDirectStatusPublishPayload({
+        userAId: conversation.participantAId,
+        userBId: conversation.participantBId,
+        messageId,
+        status,
+        readerId: reader.id,
+        readerRole: reader.role,
+      }),
+    );
+  }
+}
+
+export async function markMessageDelivered(
+  messageId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await getCurrentSession();
+  if (!session) return { ok: false, error: "未登录" };
+  const user = session.user;
+
+  const rows = await db
+    .select({
+      id: schema.messages.id,
+      senderId: schema.messages.senderId,
+      status: schema.messages.status,
+      conversationId: schema.messages.conversationId,
+    })
+    .from(schema.messages)
+    .where(eq(schema.messages.id, messageId))
+    .limit(1);
+  if (rows.length === 0) return { ok: false, error: "消息不存在" };
+  const msg = rows[0]!;
+
+  if (msg.senderId === user.id) return { ok: false, error: "不能为自己发的消息上报状态" };
+
+  const conv = await db
+    .select()
+    .from(schema.conversations)
+    .where(eq(schema.conversations.id, msg.conversationId))
+    .limit(1);
+  if (conv.length === 0) return { ok: false, error: "会话不存在" };
+  const conversation = conv[0]!;
+
+  try {
+    await assertCanAccessConversation(user.id, user.role, conversation);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return { ok: false, error: err.message };
+    return { ok: false, error: "权限校验失败" };
+  }
+
+  if (msg.status !== "pending") return { ok: true };
+
+  await db
+    .update(schema.messages)
+    .set({ status: "delivered" })
+    .where(eq(schema.messages.id, messageId));
+
+  await publishStatusEvent(conversation, messageId, "delivered", user);
+
+  return { ok: true };
+}
+
+export async function markMessageRead(
+  messageId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await getCurrentSession();
+  if (!session) return { ok: false, error: "未登录" };
+  const user = session.user;
+
+  const rows = await db
+    .select({
+      id: schema.messages.id,
+      senderId: schema.messages.senderId,
+      status: schema.messages.status,
+      conversationId: schema.messages.conversationId,
+    })
+    .from(schema.messages)
+    .where(eq(schema.messages.id, messageId))
+    .limit(1);
+  if (rows.length === 0) return { ok: false, error: "消息不存在" };
+  const msg = rows[0]!;
+
+  if (msg.senderId === user.id) return { ok: false, error: "不能为自己发的消息上报状态" };
+
+  const conv = await db
+    .select()
+    .from(schema.conversations)
+    .where(eq(schema.conversations.id, msg.conversationId))
+    .limit(1);
+  if (conv.length === 0) return { ok: false, error: "会话不存在" };
+  const conversation = conv[0]!;
+
+  try {
+    await assertCanAccessConversation(user.id, user.role, conversation);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return { ok: false, error: err.message };
+    return { ok: false, error: "权限校验失败" };
+  }
+
+  if (msg.status !== "delivered") return { ok: true };
+
+  await db
+    .update(schema.messages)
+    .set({ status: "displayed" })
+    .where(eq(schema.messages.id, messageId));
+
+  await publishStatusEvent(conversation, messageId, "displayed", user);
+
+  return { ok: true };
 }
 
 /* ------------------------------ 已读标记 ------------------------------ */

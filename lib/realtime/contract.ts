@@ -38,6 +38,17 @@ export const publishPayloadSchema = z.object({
 
 export type PublishPayload = z.infer<typeof publishPayloadSchema>;
 
+/** 消息状态变更推送载荷（Next.js → Worker） */
+export const statusPublishPayloadSchema = z.object({
+  roomName: z.string().min(1),
+  messageId: z.uuid(),
+  status: z.enum(["delivered", "displayed"]),
+  readerId: z.string(),
+  readerRole: z.enum(["parent", "teacher", "classroom", "admin"]),
+});
+
+export type StatusPublishPayload = z.infer<typeof statusPublishPayloadSchema>;
+
 /* --------------------------- Worker → 客户端 (WebSocket) -------------------------- */
 
 export const chatMessageSchema = z.object({
@@ -70,11 +81,21 @@ export const presenceFrameSchema = z.object({
   users: z.array(presenceUserSchema),
 });
 
+/** 消息状态变更帧（Worker → 客户端） */
+export const messageStatusSchema = z.object({
+  kind: z.literal("message-status"),
+  messageId: z.uuid(),
+  status: z.enum(["delivered", "displayed"]),
+  readerId: z.string(),
+  readerRole: z.enum(["parent", "teacher", "classroom", "admin"]),
+});
+
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
 export type ChatControl = z.infer<typeof chatControlSchema>;
 export type PresenceUser = z.infer<typeof presenceUserSchema>;
 export type PresenceFrame = z.infer<typeof presenceFrameSchema>;
-export type ChatFrame = ChatMessage | ChatControl | PresenceFrame;
+export type MessageStatusFrame = z.infer<typeof messageStatusSchema>;
+export type ChatFrame = ChatMessage | ChatControl | PresenceFrame | MessageStatusFrame;
 
 /* --------------------------- 客户端 → Worker (WebSocket) -------------------------- */
 
@@ -137,5 +158,40 @@ export function toDirectPublishPayload(input: {
     content: input.content,
     mimeType: input.mimeType,
     createdAt: input.createdAt.toISOString(),
+  };
+}
+
+/** 便捷构造：消息状态变更发布载荷（班级群聊） */
+export function toStatusPublishPayload(input: {
+  classId: string;
+  messageId: string;
+  status: "delivered" | "displayed";
+  readerId: string;
+  readerRole: UserRole;
+}): StatusPublishPayload {
+  return {
+    roomName: roomNameForClass(input.classId),
+    messageId: input.messageId,
+    status: input.status,
+    readerId: input.readerId,
+    readerRole: input.readerRole,
+  };
+}
+
+/** 便捷构造：消息状态变更发布载荷（私信） */
+export function toDirectStatusPublishPayload(input: {
+  userAId: string;
+  userBId: string;
+  messageId: string;
+  status: "delivered" | "displayed";
+  readerId: string;
+  readerRole: UserRole;
+}): StatusPublishPayload {
+  return {
+    roomName: roomNameForDirect(input.userAId, input.userBId),
+    messageId: input.messageId,
+    status: input.status,
+    readerId: input.readerId,
+    readerRole: input.readerRole,
   };
 }

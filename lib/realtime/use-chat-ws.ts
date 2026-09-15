@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   chatMessageSchema,
   presenceFrameSchema,
+  messageStatusSchema,
   type ChatMessage,
   type PresenceUser,
 } from "./contract";
@@ -15,9 +16,17 @@ import {
 const MAX_QUEUED = 200;
 const RECONNECT_DELAY = 3000;
 
+export type MessageStatusUpdate = {
+  messageId: string;
+  status: "delivered" | "displayed";
+  readerId: string;
+  readerRole: string;
+};
+
 export function useChatWs(
   wsUrl: string | null,
   userInfo?: { userId: string; name: string; role: "parent" | "teacher" | "classroom" | "admin" },
+  onStatusChange?: (update: MessageStatusUpdate) => void,
 ): {
   messages: ChatMessage[];
   connected: boolean;
@@ -27,6 +36,8 @@ export function useChatWs(
   const [connected, setConnected] = useState(false);
   const [presence, setPresence] = useState<PresenceUser[]>([]);
   const lastCreatedAt = useRef<string | null>(null);
+  const statusCbRef = useRef(onStatusChange);
+  statusCbRef.current = onStatusChange;
 
   useEffect(() => {
     setMessages([]);
@@ -95,6 +106,18 @@ export function useChatWs(
           try {
             const pf = presenceFrameSchema.parse(raw);
             setPresence(pf.users);
+          } catch {
+            /* ignore invalid */
+          }
+        } else if (frame.kind === "message-status") {
+          try {
+            const sf = messageStatusSchema.parse(raw);
+            statusCbRef.current?.({
+              messageId: sf.messageId,
+              status: sf.status,
+              readerId: sf.readerId,
+              readerRole: sf.readerRole,
+            });
           } catch {
             /* ignore invalid */
           }

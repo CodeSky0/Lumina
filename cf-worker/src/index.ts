@@ -63,6 +63,22 @@ interface PresenceFrame {
   users: PresenceUser[];
 }
 
+interface StatusPublishPayload {
+  roomName: string;
+  messageId: string;
+  status: "delivered" | "displayed";
+  readerId: string;
+  readerRole: "parent" | "teacher" | "classroom" | "admin";
+}
+
+interface MessageStatusFrame {
+  kind: "message-status";
+  messageId: string;
+  status: "delivered" | "displayed";
+  readerId: string;
+  readerRole: "parent" | "teacher" | "classroom" | "admin";
+}
+
 const RECENT_LIMIT = 50;
 
 /* -------------------------------------------------------------------------- */
@@ -84,6 +100,10 @@ export class RoomDO implements DurableObject {
 
     if (url.pathname === "/publish" && request.method === "POST") {
       return this.handlePublish(request);
+    }
+
+    if (url.pathname === "/publish-status" && request.method === "POST") {
+      return this.handlePublishStatus(request);
     }
 
     if (request.headers.get("Upgrade") === "websocket") {
@@ -130,6 +150,43 @@ export class RoomDO implements DurableObject {
     if (this.recent.length > RECENT_LIMIT) {
       this.recent.splice(0, this.recent.length - RECENT_LIMIT);
     }
+
+    const sockets = this.state.getWebSockets();
+    const data = JSON.stringify(frame);
+    for (const ws of sockets) {
+      try {
+        ws.send(data);
+      } catch {
+        // 单个 socket 发送失败不影响其他
+      }
+    }
+
+    return new Response("OK", { status: 200 });
+  }
+
+  private async handlePublishStatus(request: Request): Promise<Response> {
+    let payload: StatusPublishPayload;
+    try {
+      payload = (await request.json()) as StatusPublishPayload;
+    } catch {
+      return new Response("Invalid JSON", { status: 400 });
+    }
+    if (
+      typeof payload.messageId !== "string" ||
+      (payload.status !== "delivered" && payload.status !== "displayed") ||
+      typeof payload.readerId !== "string" ||
+      typeof payload.readerRole !== "string"
+    ) {
+      return new Response("Bad Request", { status: 400 });
+    }
+
+    const frame: MessageStatusFrame = {
+      kind: "message-status",
+      messageId: payload.messageId,
+      status: payload.status,
+      readerId: payload.readerId,
+      readerRole: payload.readerRole,
+    };
 
     const sockets = this.state.getWebSockets();
     const data = JSON.stringify(frame);
@@ -248,6 +305,27 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/publish" && request.method === "POST") {
+      const auth = request.headers.get("Authorization");
+      if (!auth || auth !== `Bearer ${env.LUMINA_API_TOKEN}`) {
+        return new Response("Unauthorized", { status: 401 });
+      }
+      const upstream = request.clone();
+      let roomName: unknown;
+      try {
+        const body = (await request.json()) as { roomName?: unknown };
+        roomName = body.roomName;
+      } catch {
+        return new Response("Invalid JSON", { status: 400 });
+      }
+      if (typeof roomName !== "string" || roomName.length === 0) {
+        return new Response("Missing roomName", { status: 400 });
+      }
+      const id = env.ROOM.idFromName(roomName);
+      const stub = env.ROOM.get(id);
+      return stub.fetch(upstream);
+    }
+
+    if (url.pathname === "/publish-status" && request.method === "POST") {
       const auth = request.headers.get("Authorization");
       if (!auth || auth !== `Bearer ${env.LUMINA_API_TOKEN}`) {
         return new Response("Unauthorized", { status: 401 });

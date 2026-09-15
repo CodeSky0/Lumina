@@ -3,6 +3,7 @@
  * 未配置 CF_WORKER_URL / CF_WORKER_AUTH_TOKEN 时静默跳过。
  */
 import { publishPayloadSchema, type PublishPayload } from "./contract";
+import { statusPublishPayloadSchema, type StatusPublishPayload } from "./contract";
 
 export async function publishMessage(payload: PublishPayload): Promise<void> {
   const url = process.env.CF_WORKER_URL;
@@ -19,5 +20,26 @@ export async function publishMessage(payload: PublishPayload): Promise<void> {
   });
   if (!res.ok) {
     console.error("推送至 CF Worker 失败:", res.status);
+  }
+}
+
+/** 推送消息状态变更（已送达/已读）至 CF Worker 广播 */
+export async function publishMessageStatus(
+  payload: StatusPublishPayload,
+): Promise<void> {
+  const url = process.env.CF_WORKER_URL;
+  const token = process.env.CF_WORKER_AUTH_TOKEN;
+  if (!url || !token) return;
+
+  const res = await fetch(`${url}/publish-status`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(statusPublishPayloadSchema.parse(payload)),
+  });
+  if (!res.ok) {
+    console.error("推送状态变更至 CF Worker 失败:", res.status);
   }
 }

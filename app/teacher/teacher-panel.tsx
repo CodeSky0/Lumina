@@ -9,6 +9,7 @@ export default function TeacherPanel({ teacherId, teacherName, cfWorkerUrl }: { 
       userName={teacherName}
       userRole="teacher"
       allowUrgent
+      showStatus
       cfWorkerUrl={cfWorkerUrl}
     />
   );

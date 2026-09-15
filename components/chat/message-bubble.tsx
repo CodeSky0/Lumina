@@ -17,7 +17,7 @@ import {
 const STATUS_LABEL: Record<string, string> = {
   pending: "待送达",
   delivered: "已送达",
-  displayed: "已展示",
+  displayed: "已读",
 };
 
 const RECALL_WINDOW_MS = 2 * 60 * 1000;
