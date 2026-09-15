@@ -2,7 +2,7 @@
   "name": "Lumina 流光",
   "short_name": "Lumina",
   "description": "极简实时家校沟通平台",
-  "start_url": "/login",
+  "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#fefefb",
