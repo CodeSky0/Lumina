@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import type { PresenceUser } from "@/lib/realtime/contract";
 
 export function ChatHeader({
@@ -39,6 +40,13 @@ export function ChatHeader({
             </svg>
           </button>
         )}
+        <Image
+          src="/icon-chat.png"
+          alt="实时消息"
+          width={28}
+          height={28}
+          className="shrink-0 rounded-md"
+        />
         <div className="flex flex-col">
           <h2 className="font-serif text-title-20 font-medium text-neutral-10">
             {title}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { motion } from "motion/react";
 import { Badge } from "@/components/ui/badge";
 import { EASE } from "@/lib/motion";
@@ -41,9 +42,19 @@ export default function AboutPage() {
           transition={{ duration: 0.5, ease: EASE.out }}
           className="mb-10"
         >
-          <h1 className="font-serif text-display-48 font-medium tracking-tight text-neutral-10">
-            Lumina 流光
-          </h1>
+          <div className="mb-4 flex items-center gap-4">
+            <Image
+              src="/logo.png"
+              alt="Lumina 流光"
+              width={64}
+              height={64}
+              priority
+              className="rounded-xl"
+            />
+            <h1 className="font-serif text-display-48 font-medium tracking-tight text-neutral-10">
+              Lumina 流光
+            </h1>
+          </div>
           <div className="mt-3 flex items-center gap-2">
             <Badge tone="accent">版本 {VERSION}</Badge>
             <Badge tone="neutral">alpha</Badge>

@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 export type AdminTab = "dashboard" | "users" | "subjects" | "classes" | "bindings" | "audit";
 
 const TAB_LABELS: Record<AdminTab, string> = {
@@ -26,9 +28,18 @@ export function AdminSidebar({
 }: AdminSidebarProps) {
   return (
     <aside className="flex w-56 shrink-0 flex-col space-y-3 border-r border-border bg-neutral-2 p-4">
-      <h1 className="font-serif text-title-24 font-medium text-neutral-10">
-        管理端
-      </h1>
+      <div className="flex items-center gap-2">
+        <Image
+          src="/icon-admin.png"
+          alt="管理端"
+          width={32}
+          height={32}
+          className="rounded-lg"
+        />
+        <h1 className="font-serif text-title-24 font-medium text-neutral-10">
+          管理端
+        </h1>
+      </div>
       <p className="text-copy-13 text-neutral-7">{adminName}</p>
 
       <nav className="mt-4 space-y-1">

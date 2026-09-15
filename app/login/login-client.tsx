@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { motion } from "motion/react";
 import { authClient } from "@/lib/auth/client";
 import { staggerContainer, charItem, springPop, springTransition } from "@/lib/motion";
@@ -82,11 +83,19 @@ export default function LoginPage() {
         className="relative w-full max-w-sm space-y-6 rounded-xl bg-neutral-2/80 p-8 ring-1 ring-border backdrop-blur-sm"
       >
         <div className="space-y-1">
+          <Image
+            src="/logo.png"
+            alt="Lumina 流光"
+            width={48}
+            height={48}
+            priority
+            className="mx-auto rounded-lg"
+          />
           <motion.h1
             variants={staggerContainer(0.07)}
             initial="hidden"
             animate="visible"
-            className="font-serif text-title-28 font-medium text-neutral-10"
+            className="text-center font-serif text-title-28 font-medium text-neutral-10"
           >
             {TITLE.split("").map((ch, i) => (
               <motion.span

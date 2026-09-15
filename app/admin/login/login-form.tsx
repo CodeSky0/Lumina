@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { authClient } from "@/lib/auth/client";
 import { createFirstAdmin } from "@/lib/admin/actions";
 
@@ -55,10 +56,17 @@ export default function AdminLoginForm({ hasAdmin }: { hasAdmin: boolean }) {
           className="w-full max-w-sm space-y-6 rounded-xl bg-neutral-2 p-8 ring-1 ring-border"
         >
           <div className="space-y-1">
-            <h1 className="font-serif text-title-28 font-medium text-neutral-10">
+            <Image
+              src="/icon-admin.png"
+              alt="管理端"
+              width={40}
+              height={40}
+              className="mx-auto rounded-lg"
+            />
+            <h1 className="text-center font-serif text-title-28 font-medium text-neutral-10">
               初始化管理员
             </h1>
-            <p className="text-copy-13 text-neutral-7">
+            <p className="text-center text-copy-13 text-neutral-7">
               首次使用 — 创建首个管理员账户
             </p>
           </div>
@@ -152,10 +160,17 @@ export default function AdminLoginForm({ hasAdmin }: { hasAdmin: boolean }) {
         className="w-full max-w-sm space-y-6 rounded-xl bg-neutral-2 p-8 ring-1 ring-border"
       >
         <div className="space-y-1">
-          <h1 className="font-serif text-title-28 font-medium text-neutral-10">
+          <Image
+            src="/icon-admin.png"
+            alt="管理端"
+            width={40}
+            height={40}
+            className="mx-auto rounded-lg"
+          />
+          <h1 className="text-center font-serif text-title-28 font-medium text-neutral-10">
             管理端登录
           </h1>
-          <p className="text-copy-13 text-neutral-7">Lumina · 仅限管理员</p>
+          <p className="text-center text-copy-13 text-neutral-7">Lumina · 仅限管理员</p>
         </div>
         <div className="space-y-1.5">
           <label htmlFor="id" className="text-label-12 font-medium text-neutral-9">
