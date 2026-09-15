@@ -10,10 +10,14 @@ export function MessageInput({
   conversationId,
   conversationType,
   allowUrgent,
+  onOptimisticSend,
+  onSendConfirmed,
 }: {
   conversationId: string;
   conversationType?: ConversationType;
   allowUrgent?: boolean;
+  onOptimisticSend?: (tempId: string, content: string, type: "text" | "urgent") => void;
+  onSendConfirmed?: (tempId: string, ok: boolean, realId?: string) => void;
 }) {
   const [text, setText] = useState("");
   const [urgent, setUrgent] = useState(false);
@@ -155,19 +159,40 @@ export function MessageInput({
     if (activeMentions.length > 0) {
       fd.set("mentions", JSON.stringify(activeMentions));
     }
+    const hasFile = !!fileRef.current?.files?.[0];
+    const tempId = hasFile
+      ? null
+      : `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    if (tempId && onOptimisticSend) {
+      onOptimisticSend(tempId, text, urgent ? "urgent" : "text");
+      setText("");
+      setUrgent(false);
+      setMentions([]);
+    }
     startTransition(async () => {
       try {
         const res = await sendMessage(fd);
         if (res.ok) {
-          setText("");
-          setUrgent(false);
-          setMentions([]);
+          if (!tempId) {
+            setText("");
+            setUrgent(false);
+            setMentions([]);
+          }
           if (fileRef.current) fileRef.current.value = "";
+          if (tempId && onSendConfirmed) {
+            onSendConfirmed(tempId, true, res.id);
+          }
         } else {
           setFeedback(res.error);
+          if (tempId && onSendConfirmed) {
+            onSendConfirmed(tempId, false);
+          }
         }
       } catch {
         setFeedback("发送失败，请重试");
+        if (tempId && onSendConfirmed) {
+          onSendConfirmed(tempId, false);
+        }
       }
     });
   }

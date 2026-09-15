@@ -700,7 +700,7 @@ export async function sendMessage(
       content,
       type,
       mimeType,
-      status: "pending",
+      status: "delivered",
       mentions: parsedMentions.length > 0 ? parsedMentions : null,
     })
     .returning();
@@ -756,7 +756,7 @@ export async function sendMessage(
     );
   }
 
-  return { ok: true, id: msg.id, status: "pending" };
+  return { ok: true, id: msg.id, status: "delivered" };
 }
 
 /* ------------------------------ 查询消息 ------------------------------ */
@@ -864,55 +864,6 @@ async function publishStatusEvent(
       }),
     );
   }
-}
-
-export async function markMessageDelivered(
-  messageId: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const session = await getCurrentSession();
-  if (!session) return { ok: false, error: "未登录" };
-  const user = session.user;
-
-  const rows = await db
-    .select({
-      id: schema.messages.id,
-      senderId: schema.messages.senderId,
-      status: schema.messages.status,
-      conversationId: schema.messages.conversationId,
-    })
-    .from(schema.messages)
-    .where(eq(schema.messages.id, messageId))
-    .limit(1);
-  if (rows.length === 0) return { ok: false, error: "消息不存在" };
-  const msg = rows[0]!;
-
-  if (msg.senderId === user.id) return { ok: false, error: "不能为自己发的消息上报状态" };
-
-  const conv = await db
-    .select()
-    .from(schema.conversations)
-    .where(eq(schema.conversations.id, msg.conversationId))
-    .limit(1);
-  if (conv.length === 0) return { ok: false, error: "会话不存在" };
-  const conversation = conv[0]!;
-
-  try {
-    await assertCanAccessConversation(user.id, user.role, conversation);
-  } catch (err) {
-    if (err instanceof ForbiddenError) return { ok: false, error: err.message };
-    return { ok: false, error: "权限校验失败" };
-  }
-
-  if (msg.status !== "pending") return { ok: true };
-
-  await db
-    .update(schema.messages)
-    .set({ status: "delivered" })
-    .where(eq(schema.messages.id, messageId));
-
-  await publishStatusEvent(conversation, messageId, "delivered", user);
-
-  return { ok: true };
 }
 
 export async function markMessageRead(

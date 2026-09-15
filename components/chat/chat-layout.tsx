@@ -14,7 +14,6 @@ import {
   getMyConversations,
   getConversationMessages,
   markConversationRead,
-  markMessageDelivered,
   markMessageRead,
   type ConversationItem,
   type ClassMessage,
@@ -122,7 +121,7 @@ export function ChatLayout({
     setMessages((prev) => {
       const existingIds = new Set(prev.map((m) => m.id));
       const newMsgs = wsMessages
-        .filter((m) => !existingIds.has(m.messageId))
+        .filter((m) => !existingIds.has(m.messageId) && m.senderId !== userId)
         .map((m): ClassMessage => ({
           id: m.messageId,
           senderName: m.senderName,
@@ -131,7 +130,7 @@ export function ChatLayout({
           content: m.content,
           type: m.type,
           mimeType: m.mimeType,
-          status: m.senderId === userId ? "pending" : "delivered",
+          status: "delivered",
           deletedAt: null,
           editedAt: null,
           editHistory: null,
@@ -159,14 +158,42 @@ export function ChatLayout({
       if (!shouldReport) continue;
       reportedRef.current.add(msg.id);
       if (msg.status === "displayed") continue;
-      if (msg.status === "pending") {
-        void markMessageDelivered(msg.id).catch(() => {});
-      }
       setTimeout(() => {
         void markMessageRead(msg.id).catch(() => {});
       }, 5000);
     }
   }, [messages, selected, userId, userRole]);
+
+  function handleOptimisticSend(tempId: string, content: string, type: "text" | "urgent"): void {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        senderName: userName,
+        senderRole: userRole as ClassMessage["senderRole"],
+        senderId: userId,
+        content,
+        type,
+        mimeType: null,
+        status: "pending",
+        deletedAt: null,
+        editedAt: null,
+        editHistory: null,
+        mentions: null,
+        createdAt: new Date(),
+      },
+    ]);
+  }
+
+  function handleSendConfirmed(tempId: string, ok: boolean, realId?: string): void {
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== tempId) return m;
+        if (!ok) return m;
+        return { ...m, id: realId ?? tempId, status: "delivered" };
+      }),
+    );
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-neutral-1">
@@ -220,6 +247,8 @@ export function ChatLayout({
                 conversationId={selected.conversationId}
                 conversationType={selected.type}
                 allowUrgent={allowUrgent}
+                onOptimisticSend={handleOptimisticSend}
+                onSendConfirmed={handleSendConfirmed}
               />
             </div>
           </>
