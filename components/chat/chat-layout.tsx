@@ -40,7 +40,6 @@ export function ChatLayout({
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ClassMessage[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<string>("");
   const [searching, setSearching] = useState(false);
   const reportedRef = useRef(new Set<string>());
 
@@ -94,9 +93,6 @@ export function ChatLayout({
       const msgs = await getConversationMessages(selectedId!);
       if (active) {
         setMessages(msgs);
-        if (msgs.length > 0) {
-          setCurrentUserId(msgs[0]!.senderId);
-        }
       }
     }
 
@@ -216,7 +212,7 @@ export function ChatLayout({
             )}
             <ChatWindow
               messages={messages}
-              currentUserId={currentUserId}
+              currentUserId={userId}
               showStatus={showStatus}
             />
             <div className="border-t border-border px-4 py-3">
