@@ -52,6 +52,33 @@ export function CatLottie({
   facing: "left" | "right";
   size: number;
 }) {
+  const ratio = CAT_DIM.w / CAT_DIM.h;
+  const w = Math.round(size * ratio);
+
+  const [pngOk, setPngOk] = useState(true);
+  useEffect(() => {
+    setPngOk(true);
+  }, [pose]);
+
+  if (pngOk) {
+    return (
+      <img
+        key={`png-${pose}`}
+        src={`/cat/${pose}.png`}
+        onError={() => setPngOk(false)}
+        alt=""
+        draggable={false}
+        style={{
+          width: w,
+          height: size,
+          objectFit: "contain",
+          objectPosition: "bottom center",
+          transform: facing === "left" ? "scaleX(-1)" : undefined,
+        }}
+      />
+    );
+  }
+
   const name = POSE_FILE[pose];
   const [data, setData] = useState<object | null>(() => (name ? (cache.get(name) ?? null) : null));
 
@@ -69,9 +96,6 @@ export function CatLottie({
     };
   }, [name]);
 
-  const ratio = CAT_DIM.w / CAT_DIM.h;
-  const w = Math.round(size * ratio);
-
   if (data) {
     return (
       <div
@@ -84,12 +108,7 @@ export function CatLottie({
           justifyContent: "center",
         }}
       >
-        <Lottie
-          src={data}
-          loop
-          autoplay
-          style={{ width: w, height: size }}
-        />
+        <Lottie src={data} loop autoplay style={{ width: w, height: size }} />
       </div>
     );
   }
