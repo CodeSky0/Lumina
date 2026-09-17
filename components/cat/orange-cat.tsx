@@ -1,18 +1,20 @@
 "use client";
 
+import { useEffect } from "react";
 import { motion } from "motion/react";
-import { PoseArt, CAT_DIM, type CatPose } from "./cat-sprites";
+import { CAT_DIM, type CatPose } from "./cat-sprites";
+import { CatLottie, preloadCatLotties } from "./cat-lottie";
 import { EASE } from "@/lib/motion";
 
 const BREATH: Partial<Record<CatPose, { scale?: number[]; y?: number[]; duration: number }>> = {
-  sleep: { scale: [1, 1.04, 1], duration: 3.6 },
-  idle: { scale: [1, 1.018, 1], duration: 3.2 },
-  sit: { scale: [1, 1.018, 1], duration: 3.4 },
-  lie: { scale: [1, 1.015, 1], duration: 3.8 },
-  groom: { scale: [1, 1.02, 1], duration: 3 },
-  yawn: { scale: [1, 1.02, 1], duration: 3.4 },
-  stretch: { scale: [1, 1.025, 1], duration: 2.8 },
-  walk: { y: [0, -1.6, 0], duration: 0.5 },
+  sleep: { scale: [1, 1.03, 1], duration: 3.6 },
+  idle: { scale: [1, 1.015, 1], duration: 3.2 },
+  sit: { scale: [1, 1.015, 1], duration: 3.4 },
+  lie: { scale: [1, 1.012, 1], duration: 3.8 },
+  groom: { scale: [1, 1.018, 1], duration: 3 },
+  yawn: { scale: [1, 1.018, 1], duration: 3.4 },
+  stretch: { scale: [1, 1.02, 1], duration: 2.8 },
+  walk: { y: [0, -1.4, 0], duration: 0.5 },
 };
 
 export function OrangeCat({
@@ -30,6 +32,10 @@ export function OrangeCat({
   const w = Math.round(size * ratio);
   const breath = BREATH[pose];
 
+  useEffect(() => {
+    preloadCatLotties();
+  }, []);
+
   return (
     <motion.div
       className={className}
@@ -39,21 +45,12 @@ export function OrangeCat({
     >
       <motion.div
         key={pose}
-        initial={{ opacity: 0.35, scale: 0.9 }}
+        initial={{ opacity: 0.4, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.22, ease: EASE.spring }}
         style={{ width: w, height: size }}
       >
-        <svg
-          viewBox={`0 0 ${CAT_DIM.w} ${CAT_DIM.h}`}
-          width={w}
-          height={size}
-          style={{ overflow: "visible" }}
-        >
-          <g transform={facing === "left" ? `matrix(-1 0 0 1 ${CAT_DIM.w} 0)` : undefined}>
-            <PoseArt pose={pose} />
-          </g>
-        </svg>
+        <CatLottie pose={pose} facing={facing} size={size} />
       </motion.div>
     </motion.div>
   );
