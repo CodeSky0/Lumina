@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { sendMessage, getGroupMembers, type GroupMember } from "@/lib/messages/actions";
-import type { ConversationType } from "@/lib/db/schema";
+import type { ConversationType, MessageType } from "@/lib/db/schema";
 import { EASE } from "@/lib/motion";
 
 export function MessageInput({
@@ -16,13 +16,14 @@ export function MessageInput({
   conversationId: string;
   conversationType?: ConversationType;
   allowUrgent?: boolean;
-  onOptimisticSend?: (tempId: string, content: string, type: "text" | "urgent") => void;
-  onSendConfirmed?: (tempId: string, ok: boolean, realId?: string) => void;
+  onOptimisticSend?: (tempId: string, content: string, type: MessageType) => void;
+  onSendConfirmed?: (tempId: string, ok: boolean, realId?: string, content?: string) => void;
 }) {
   const [text, setText] = useState("");
   const [urgent, setUrgent] = useState(false);
   const [pending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [hasFile, setHasFile] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -43,6 +44,16 @@ export function MessageInput({
 
   const [bursts, setBursts] = useState<{ id: number; particles: { angle: number; dist: number }[] }[]>([]);
   const [sendHovered, setSendHovered] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
+      recordStreamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
 
   function triggerBurst() {
     const id = Date.now();
@@ -146,7 +157,7 @@ export function MessageInput({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!text.trim() && !fileRef.current?.files?.[0]) return;
+    if (!text.trim() && !hasFile) return;
     setFeedback(null);
     const fd = new FormData();
     fd.set("conversationId", conversationId);
@@ -159,38 +170,55 @@ export function MessageInput({
     if (activeMentions.length > 0) {
       fd.set("mentions", JSON.stringify(activeMentions));
     }
-    const hasFile = !!fileRef.current?.files?.[0];
-    const tempId = hasFile
-      ? null
-      : `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    if (tempId && onOptimisticSend) {
-      onOptimisticSend(tempId, text, urgent ? "urgent" : "text");
-      setText("");
-      setUrgent(false);
-      setMentions([]);
+    const hasFileNow = !!fileRef.current?.files?.[0];
+    // eslint-disable-next-line react-hooks/purity -- called in event handler, not render
+    const tempId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    let optimisticContent = text;
+    let optimisticType: MessageType = urgent ? "urgent" : "text";
+    if (hasFileNow) {
+      const file = fileRef.current!.files![0]!;
+      if (file.type.startsWith("image/")) {
+        optimisticContent = URL.createObjectURL(file);
+        optimisticType = "image";
+      } else if (file.type.startsWith("audio/")) {
+        optimisticContent = JSON.stringify({ url: "", duration: Number(fd.get("duration") ?? 0) });
+        optimisticType = "audio";
+      } else {
+        optimisticContent = JSON.stringify({ url: "", name: file.name, size: file.size });
+        optimisticType = "file";
+      }
+    }
+    if (onOptimisticSend) {
+      onOptimisticSend(tempId, optimisticContent, optimisticType);
+      if (!hasFileNow) {
+        setText("");
+        setUrgent(false);
+        setMentions([]);
+      }
     }
     startTransition(async () => {
       try {
         const res = await sendMessage(fd);
         if (res.ok) {
-          if (!tempId) {
+          if (!hasFileNow) {
             setText("");
             setUrgent(false);
             setMentions([]);
           }
           if (fileRef.current) fileRef.current.value = "";
-          if (tempId && onSendConfirmed) {
-            onSendConfirmed(tempId, true, res.id);
+          setHasFile(false);
+          if (onSendConfirmed) {
+            onSendConfirmed(tempId, true, res.id, hasFileNow ? res.content : undefined);
           }
         } else {
           setFeedback(res.error);
-          if (tempId && onSendConfirmed) {
+          if (onSendConfirmed) {
             onSendConfirmed(tempId, false);
           }
         }
       } catch {
         setFeedback("发送失败，请重试");
-        if (tempId && onSendConfirmed) {
+        if (onSendConfirmed) {
           onSendConfirmed(tempId, false);
         }
       }
@@ -329,6 +357,7 @@ export function MessageInput({
                 type="file"
                 name="file"
                 className="hidden"
+                onChange={(e) => setHasFile(!!e.target.files?.[0])}
               />
             </label>
             <button
@@ -382,7 +411,7 @@ export function MessageInput({
               <button
                 type="submit"
                 onClick={triggerBurst}
-                disabled={pending || (!text.trim() && !fileRef.current?.files?.[0])}
+                disabled={pending || (!text.trim() && !hasFile)}
                 className="relative flex h-9 shrink-0 items-center justify-center rounded-lg bg-accent px-4 text-copy-14 font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
               >
                 <span className="relative z-10">{pending ? "发送中" : "发送"}</span>

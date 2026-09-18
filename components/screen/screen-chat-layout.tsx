@@ -10,6 +10,7 @@ import {
   markMessageRead,
   type ClassMessage,
 } from "@/lib/messages/actions";
+import type { MessageType } from "@/lib/db/schema";
 import { useChatWs } from "@/lib/realtime/use-chat-ws";
 import { roomNameForClass } from "@/lib/realtime/contract";
 import type { ScreenTeacher } from "@/lib/messages/queries";
@@ -81,6 +82,7 @@ export function ScreenChatLayout({
 
   useEffect(() => {
     if (wsMessages.length === 0) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync WS messages into local state
     setMessages((prev) => {
       const existingIds = new Set(prev.map((m) => m.id));
       const newMsgs = wsMessages
@@ -106,16 +108,22 @@ export function ScreenChatLayout({
   }, [wsMessages, userId]);
 
   useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
     for (const msg of messages) {
       if (reportedRef.current.has(msg.id)) continue;
       if (msg.senderId === userId) continue;
       if (msg.senderRole !== "teacher") continue;
       reportedRef.current.add(msg.id);
       if (msg.status === "displayed") continue;
-      setTimeout(() => {
-        void markMessageRead(msg.id).catch(() => {});
-      }, 5000);
+      timers.push(
+        setTimeout(() => {
+          void markMessageRead(msg.id).catch(() => {});
+        }, 5000),
+      );
     }
+    return () => {
+      for (const t of timers) clearTimeout(t);
+    };
   }, [messages, userId]);
 
   const filteredMessages = useMemo(() => {
@@ -145,7 +153,7 @@ export function ScreenChatLayout({
   function handleOptimisticSend(
     tempId: string,
     content: string,
-    type: "text" | "urgent",
+    type: MessageType,
   ): void {
     setMessages((prev) => [
       ...prev,
@@ -171,12 +179,13 @@ export function ScreenChatLayout({
     tempId: string,
     ok: boolean,
     realId?: string,
+    content?: string,
   ): void {
     setMessages((prev) =>
       prev.map((m) => {
         if (m.id !== tempId) return m;
-        if (!ok) return m;
-        return { ...m, id: realId ?? tempId, status: "delivered" };
+        if (!ok) return { ...m, status: "pending" as const };
+        return { ...m, id: realId ?? tempId, status: "delivered" as const, content: content ?? m.content };
       }),
     );
   }

@@ -18,6 +18,7 @@ export function PushSubscribe() {
       "PushManager" in window &&
       VAPID_PUBLIC_KEY
     ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- detect push support on mount
       setSupported(true);
       setPermission(Notification.permission);
 

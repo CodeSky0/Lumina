@@ -115,14 +115,6 @@ function renderTextWithMentions(
 }
 
 function AudioPlayer({ content }: { content: string }) {
-  let info: { url: string; duration: number } | null = null;
-  try {
-    info = JSON.parse(content);
-  } catch {
-    return <p className="text-copy-14">语音解析失败</p>;
-  }
-  if (!info) return null;
-
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -149,6 +141,14 @@ function AudioPlayer({ content }: { content: string }) {
       el.removeEventListener("ended", onEnded);
     };
   }, []);
+
+  let info: { url: string; duration: number } | null = null;
+  try {
+    info = JSON.parse(content);
+  } catch {
+    return <p className="text-copy-14">语音解析失败</p>;
+  }
+  if (!info) return null;
 
   function togglePlay() {
     const audio = audioRef.current;
@@ -285,30 +285,56 @@ export function MessageBubble({
   const [editText, setEditText] = useState(msg.content);
   const [pending, startTransition] = useTransition();
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync editText when message content changes externally
+    if (!editing) setEditText(msg.content);
+  }, [msg.content, editing]);
+
+  const [canRecall, setCanRecall] = useState(
+    () => isSelf && !msg.deletedAt && Date.now() - msg.createdAt.getTime() < RECALL_WINDOW_MS,
+  );
+  useEffect(() => {
+    if (!isSelf || msg.deletedAt) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- update recall eligibility
+      setCanRecall(false);
+      return;
+    }
+    const remaining = RECALL_WINDOW_MS - (Date.now() - msg.createdAt.getTime());
+    if (remaining <= 0) {
+      setCanRecall(false);
+      return;
+    }
+    const timer = setTimeout(() => setCanRecall(false), remaining);
+    return () => clearTimeout(timer);
+  }, [isSelf, msg.deletedAt, msg.createdAt]);
+
   const time = msg.createdAt.toLocaleTimeString("zh-CN", {
     hour12: false,
     hour: "2-digit",
     minute: "2-digit",
   });
 
-  const canRecall =
-    isSelf &&
-    !msg.deletedAt &&
-    Date.now() - msg.createdAt.getTime() < RECALL_WINDOW_MS;
-
   const canEdit = isSelf && !msg.deletedAt && msg.type === "text";
+
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   function handleRecall() {
     startTransition(async () => {
-      await recallMessage(msg.id);
+      const res = await recallMessage(msg.id);
+      if (!res.ok) setFeedback(res.error);
     });
   }
 
   function handleEdit() {
     if (!editText.trim()) return;
     startTransition(async () => {
-      await editMessage(msg.id, editText);
-      setEditing(false);
+      const res = await editMessage(msg.id, editText);
+      if (res.ok) {
+        setEditing(false);
+        setFeedback(null);
+      } else {
+        setFeedback(res.error);
+      }
     });
   }
 
@@ -378,6 +404,7 @@ export function MessageBubble({
                 </>
               )}
               {msg.type === "image" ? (
+                // eslint-disable-next-line @next/next/no-img-element -- dynamic user-uploaded image
                 <img
                   src={msg.content}
                   alt="图片消息"
@@ -432,6 +459,11 @@ export function MessageBubble({
             <span className="text-error">紧急</span>
           )}
         </div>
+        {feedback && (
+          <div className={`mt-0.5 text-caption-10 text-error ${isSelf ? "text-right" : "text-left"}`}>
+            {feedback}
+          </div>
+        )}
         {!editing && (canRecall || canEdit) && (
           <div className={`mt-0.5 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100 ${isSelf ? "justify-end" : "justify-start"}`}>
             {canEdit && (

@@ -13,7 +13,7 @@ import {
 } from "@/lib/rbac";
 import { toPublishPayload, toDirectPublishPayload, toStatusPublishPayload, toDirectStatusPublishPayload } from "@/lib/realtime/contract";
 import { publishMessage, publishMessageStatus } from "@/lib/realtime/publish";
-import { createNotification } from "@/lib/notifications/actions";
+import { createNotification } from "@/lib/notifications/internal";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { sanitizeAndTruncate, isFileSafe } from "@/lib/security/sanitize";
 import { z } from "zod";
@@ -589,7 +589,7 @@ const sendSchema = z.object({
 });
 
 export type SendResult =
-  | { ok: true; id: string; status: MessageStatus }
+  | { ok: true; id: string; status: MessageStatus; content: string }
   | { ok: false; error: string };
 
 export async function sendMessage(
@@ -756,7 +756,7 @@ export async function sendMessage(
     );
   }
 
-  return { ok: true, id: msg.id, status: "delivered" };
+  return { ok: true, id: msg.id, status: "delivered", content };
 }
 
 /* ------------------------------ 查询消息 ------------------------------ */
@@ -827,7 +827,9 @@ export async function getConversationMessages(
     .where(whereCondition)
     .orderBy(desc(schema.messages.createdAt))
     .limit(50);
-  return rows;
+  return rows.map((r) =>
+    r.deletedAt ? { ...r, content: "", editHistory: null } : r,
+  );
 }
 
 /* ------------------------------ 消息状态上报 ------------------------------ */
@@ -1036,6 +1038,19 @@ export async function recallMessage(
     return { ok: false, error: "超过 2 分钟不可撤回" };
   }
 
+  try {
+    const conv = await db
+      .select()
+      .from(schema.conversations)
+      .where(eq(schema.conversations.id, msg.conversationId))
+      .limit(1);
+    if (conv.length > 0) {
+      await assertCanAccessConversation(user.id, user.role, conv[0]!);
+    }
+  } catch {
+    return { ok: false, error: "无权操作此消息" };
+  }
+
   await db
     .update(schema.messages)
     .set({ deletedAt: new Date() })
@@ -1072,6 +1087,19 @@ export async function editMessage(
   }
   if (msg.type !== "text") {
     return { ok: false, error: "只能编辑文本消息" };
+  }
+
+  try {
+    const conv = await db
+      .select()
+      .from(schema.conversations)
+      .where(eq(schema.conversations.id, msg.conversationId))
+      .limit(1);
+    if (conv.length > 0) {
+      await assertCanAccessConversation(user.id, user.role, conv[0]!);
+    }
+  } catch {
+    return { ok: false, error: "无权操作此消息" };
   }
 
   const history = msg.editHistory ?? [];

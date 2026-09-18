@@ -125,6 +125,7 @@ export function ContactSidebar({
         <button
           onClick={async () => {
             await authClient.signOut();
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- intentional full reload to clear client state
             window.location.href = "/login";
           }}
           className="flex w-full items-center gap-1.5 border-t border-border px-4 py-2 text-copy-13 text-neutral-6 transition-colors hover:bg-neutral-2 hover:text-neutral-9"

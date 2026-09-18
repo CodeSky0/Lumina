@@ -18,6 +18,7 @@ import {
   type ConversationItem,
   type ClassMessage,
 } from "@/lib/messages/actions";
+import type { MessageType } from "@/lib/db/schema";
 import { useChatWs } from "@/lib/realtime/use-chat-ws";
 import { roomNameForClass, roomNameForDirect } from "@/lib/realtime/contract";
 
@@ -46,7 +47,7 @@ export function ChatLayout({
     void getMyConversations().then((cs) => {
       setConversations(cs);
       if (cs.length > 0) setSelectedId(cs[0]!.conversationId);
-    });
+    }).catch(() => {});
   }, []);
 
   const selected = conversations.find((c) => c.conversationId === selectedId);
@@ -59,7 +60,7 @@ export function ChatLayout({
           c.conversationId === id ? { ...c, unreadCount: 0 } : c,
         ),
       );
-    });
+    }).catch(() => {});
   }
 
   const wsUrl =
@@ -118,6 +119,7 @@ export function ChatLayout({
 
   useEffect(() => {
     if (wsMessages.length === 0) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync WS messages into local state
     setMessages((prev) => {
       const existingIds = new Set(prev.map((m) => m.id));
       const newMsgs = wsMessages
@@ -140,7 +142,7 @@ export function ChatLayout({
       if (newMsgs.length === 0) return prev;
       return [...prev, ...newMsgs];
     });
-  }, [wsMessages]);
+  }, [wsMessages, userId]);
 
   useEffect(() => {
     reportedRef.current.clear();
@@ -149,6 +151,7 @@ export function ChatLayout({
   useEffect(() => {
     if (!selected) return;
     const convType = selected.type;
+    const timers: ReturnType<typeof setTimeout>[] = [];
     for (const msg of messages) {
       if (reportedRef.current.has(msg.id)) continue;
       if (msg.senderId === userId) continue;
@@ -158,13 +161,18 @@ export function ChatLayout({
       if (!shouldReport) continue;
       reportedRef.current.add(msg.id);
       if (msg.status === "displayed") continue;
-      setTimeout(() => {
-        void markMessageRead(msg.id).catch(() => {});
-      }, 5000);
+      timers.push(
+        setTimeout(() => {
+          void markMessageRead(msg.id).catch(() => {});
+        }, 5000),
+      );
     }
+    return () => {
+      for (const t of timers) clearTimeout(t);
+    };
   }, [messages, selected, userId, userRole]);
 
-  function handleOptimisticSend(tempId: string, content: string, type: "text" | "urgent"): void {
+  function handleOptimisticSend(tempId: string, content: string, type: MessageType): void {
     setMessages((prev) => [
       ...prev,
       {
@@ -185,12 +193,12 @@ export function ChatLayout({
     ]);
   }
 
-  function handleSendConfirmed(tempId: string, ok: boolean, realId?: string): void {
+  function handleSendConfirmed(tempId: string, ok: boolean, realId?: string, content?: string): void {
     setMessages((prev) =>
       prev.map((m) => {
         if (m.id !== tempId) return m;
-        if (!ok) return m;
-        return { ...m, id: realId ?? tempId, status: "delivered" };
+        if (!ok) return { ...m, status: "pending" as const };
+        return { ...m, id: realId ?? tempId, status: "delivered" as const, content: content ?? m.content };
       }),
     );
   }

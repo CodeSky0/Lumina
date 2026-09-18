@@ -37,9 +37,12 @@ export function useChatWs(
   const [presence, setPresence] = useState<PresenceUser[]>([]);
   const lastCreatedAt = useRef<string | null>(null);
   const statusCbRef = useRef(onStatusChange);
-  statusCbRef.current = onStatusChange;
+  useEffect(() => {
+    statusCbRef.current = onStatusChange;
+  });
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on wsUrl change is intentional
     setMessages([]);
     setPresence([]);
     lastCreatedAt.current = null;
@@ -140,6 +143,7 @@ export function useChatWs(
         ws.close();
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- userInfo fields are individually tracked to avoid spurious reconnects
   }, [wsUrl, userInfo?.userId, userInfo?.name, userInfo?.role]);
 
   return { messages, connected, presence };

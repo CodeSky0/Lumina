@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import { motion } from "motion/react";
 import { searchMessages, type SearchResult } from "@/lib/messages/actions";
 
@@ -14,6 +14,7 @@ export function SearchPanel({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [pending, startTransition] = useTransition();
+  const reqIdRef = useRef(0);
 
   function handleSearch(value: string) {
     setQuery(value);
@@ -21,9 +22,10 @@ export function SearchPanel({
       setResults([]);
       return;
     }
+    const myId = ++reqIdRef.current;
     startTransition(async () => {
       const res = await searchMessages(value);
-      setResults(res);
+      if (myId === reqIdRef.current) setResults(res);
     });
   }
 

@@ -108,6 +108,7 @@ function Head({ cx, cy, dir = 1, closed = false }: { cx: number; cy: number; dir
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function Tail({ sx: _sx, sy: _sy, d, w = 9 }: { sx: number; sy: number; d: string; w?: number }) {
   return (
     <g>

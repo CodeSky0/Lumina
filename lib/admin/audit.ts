@@ -4,26 +4,6 @@ import { db, schema } from "@/lib/db";
 import { desc, eq } from "drizzle-orm";
 import { getCurrentSession } from "@/lib/auth/session";
 
-export async function writeAuditLog(input: {
-  userId: string;
-  action: string;
-  targetType: string;
-  targetId?: string;
-  detail?: Record<string, unknown>;
-}): Promise<void> {
-  try {
-    await db.insert(schema.auditLogs).values({
-      userId: input.userId,
-      action: input.action,
-      targetType: input.targetType,
-      targetId: input.targetId,
-      detail: input.detail,
-    });
-  } catch {
-    /* audit log failure should never block business operations */
-  }
-}
-
 export type AuditLogItem = {
   id: string;
   userId: string;

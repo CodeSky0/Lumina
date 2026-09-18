@@ -14,6 +14,7 @@ import { put } from "@vercel/blob";
 import sharp from "sharp";
 import { randomUUID } from "node:crypto";
 import { getEnv } from "@/lib/env";
+import { getCurrentSession } from "@/lib/auth/session";
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 const ACCEPTED_MIME = new Set([
@@ -27,6 +28,9 @@ export type UploadImageResult =
   | { ok: false; error: string };
 
 export async function uploadImage(file: File): Promise<UploadImageResult> {
+  const session = await getCurrentSession();
+  if (!session) return { ok: false, error: "未登录" };
+
   if (file.size === 0) {
     return { ok: false, error: "文件为空" };
   }
@@ -83,6 +87,9 @@ export type UploadFileResult =
   | { ok: false; error: string };
 
 export async function uploadFile(file: File): Promise<UploadFileResult> {
+  const session = await getCurrentSession();
+  if (!session) return { ok: false, error: "未登录" };
+
   if (file.size === 0) {
     return { ok: false, error: "文件为空" };
   }

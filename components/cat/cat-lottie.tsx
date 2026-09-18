@@ -56,12 +56,32 @@ export function CatLottie({
   const w = Math.round(size * ratio);
 
   const [pngOk, setPngOk] = useState(true);
+  const name = POSE_FILE[pose];
+  const [data, setData] = useState<object | null>(() => (name ? (cache.get(name) ?? null) : null));
+
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset PNG attempt when pose changes
     setPngOk(true);
   }, [pose]);
 
+  useEffect(() => {
+    if (!name) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear data when name is empty
+      setData(null);
+      return;
+    }
+    let active = true;
+    void loadCat(name).then((d) => {
+      if (active) setData(d);
+    });
+    return () => {
+      active = false;
+    };
+  }, [name]);
+
   if (pngOk) {
     return (
+      // eslint-disable-next-line @next/next/no-img-element -- PNG fallback for cat animation
       <img
         key={`png-${pose}`}
         src={`/cat/${pose}.png`}
@@ -78,23 +98,6 @@ export function CatLottie({
       />
     );
   }
-
-  const name = POSE_FILE[pose];
-  const [data, setData] = useState<object | null>(() => (name ? (cache.get(name) ?? null) : null));
-
-  useEffect(() => {
-    if (!name) {
-      setData(null);
-      return;
-    }
-    let active = true;
-    void loadCat(name).then((d) => {
-      if (active) setData(d);
-    });
-    return () => {
-      active = false;
-    };
-  }, [name]);
 
   if (data) {
     return (

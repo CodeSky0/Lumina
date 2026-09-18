@@ -10,6 +10,7 @@ export function ThemeToggle() {
   const [mounted, setMounted] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- next-themes mount gate to avoid hydration mismatch
   useEffect(() => setMounted(true), []);
 
   if (!mounted) {

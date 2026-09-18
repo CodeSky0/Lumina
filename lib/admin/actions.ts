@@ -13,7 +13,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { createHash, randomBytes } from "node:crypto";
 import { headers } from "next/headers";
 import { z } from "zod";
-import { writeAuditLog } from "@/lib/admin/audit";
+import { writeAuditLog } from "@/lib/admin/audit-internal";
 
 /* ------------------------------ 工具 ------------------------------ */
 

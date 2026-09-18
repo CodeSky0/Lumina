@@ -8,7 +8,7 @@ import {
   assertTeacherCanPostToClass,
   ForbiddenError,
 } from "@/lib/rbac";
-import { createNotification } from "@/lib/notifications/actions";
+import { createNotification } from "@/lib/notifications/internal";
 
 export type AnnouncementItem = {
   id: string;
