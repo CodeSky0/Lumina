@@ -5,7 +5,11 @@ import { desc, eq } from "drizzle-orm";
 import { getCurrentSession } from "@/lib/auth/session";
 
 function csvEscape(value: string | null | undefined): string {
-  const s = String(value ?? "");
+  let s = String(value ?? "");
+  // 防止 CSV 公式注入：以 = + - @ \t \r 开头的内容会被 Excel 当作公式执行
+  if (/^[=+\-@\t\r]/.test(s)) {
+    s = "'" + s;
+  }
   return `"${s.replace(/"/g, '""')}"`;
 }
 

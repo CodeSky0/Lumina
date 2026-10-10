@@ -7,6 +7,7 @@ export function RouteCurtain() {
   const pathname = usePathname();
   const prevPath = useRef(pathname);
   const curtainRef = useRef<HTMLDivElement>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (prevPath.current === pathname) return;
@@ -22,12 +23,16 @@ export function RouteCurtain() {
       curtain.style.transform = "translateX(120%)";
       curtain.style.opacity = "1";
     });
-    window.setTimeout(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
       if (!curtainRef.current) return;
       curtainRef.current.style.transition = "none";
       curtainRef.current.style.transform = "translateX(-100%)";
       curtainRef.current.style.opacity = "0";
     }, 650);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, [pathname]);
 
   return (

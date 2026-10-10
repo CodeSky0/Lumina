@@ -43,7 +43,7 @@ export function useCat(containerRef: RefObject<HTMLElement | null>) {
 
     if (prefersReduced) {
       setPoseState({ pose: "sleep", facing: init.facing });
-      requestAnimationFrame(() => {
+      const rafId = requestAnimationFrame(() => {
         const el = catRef.current;
         if (el) {
           const w = el.offsetWidth;
@@ -52,7 +52,9 @@ export function useCat(containerRef: RefObject<HTMLElement | null>) {
         }
       });
       setReady(true);
-      return;
+      return () => {
+        cancelAnimationFrame(rafId);
+      };
     }
 
     const engine = new CatEngine({

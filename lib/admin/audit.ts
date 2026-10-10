@@ -6,8 +6,8 @@ import { getCurrentSession } from "@/lib/auth/session";
 
 export type AuditLogItem = {
   id: string;
-  userId: string;
-  userName: string;
+  userId: string | null;
+  userName: string | null;
   action: string;
   targetType: string;
   targetId: string | null;
@@ -21,6 +21,7 @@ export async function getRecentAuditLogs(
   const session = await getCurrentSession();
   if (!session || session.user.role !== "admin") return [];
 
+  // leftJoin：用户可能已被删除（auditLogs.userId 为 null）
   const rows = await db
     .select({
       id: schema.auditLogs.id,
@@ -33,7 +34,7 @@ export async function getRecentAuditLogs(
       createdAt: schema.auditLogs.createdAt,
     })
     .from(schema.auditLogs)
-    .innerJoin(schema.users, eq(schema.auditLogs.userId, schema.users.id))
+    .leftJoin(schema.users, eq(schema.auditLogs.userId, schema.users.id))
     .orderBy(desc(schema.auditLogs.createdAt))
     .limit(limit);
 

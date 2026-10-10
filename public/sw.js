@@ -40,7 +40,11 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request)),
+    fetch(event.request).catch(() =>
+      caches.match(event.request).then(
+        (r) => r || new Response("Offline", { status: 503 }),
+      ),
+    ),
   );
 });
 
@@ -54,8 +58,8 @@ self.addEventListener("push", (event) => {
 
   const options = {
     body: data.body || "",
-    icon: "/manifest-icon-192.png",
-    badge: "/manifest-icon-192.png",
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
     tag: data.conversationId || "lumina-notification",
     data: { conversationId: data.conversationId },
   };

@@ -49,6 +49,15 @@ export const statusPublishPayloadSchema = z.object({
 
 export type StatusPublishPayload = z.infer<typeof statusPublishPayloadSchema>;
 
+/** 消息撤回推送载荷（Next.js → Worker） */
+export const recallPublishPayloadSchema = z.object({
+  roomName: z.string().min(1),
+  messageId: z.uuid(),
+  deletedAt: z.string(),
+});
+
+export type RecallPublishPayload = z.infer<typeof recallPublishPayloadSchema>;
+
 /* --------------------------- Worker → 客户端 (WebSocket) -------------------------- */
 
 export const chatMessageSchema = z.object({
@@ -95,7 +104,16 @@ export type ChatControl = z.infer<typeof chatControlSchema>;
 export type PresenceUser = z.infer<typeof presenceUserSchema>;
 export type PresenceFrame = z.infer<typeof presenceFrameSchema>;
 export type MessageStatusFrame = z.infer<typeof messageStatusSchema>;
-export type ChatFrame = ChatMessage | ChatControl | PresenceFrame | MessageStatusFrame;
+
+/** 消息撤回帧（Worker → 客户端） */
+export const messageRecallSchema = z.object({
+  kind: z.literal("message-recall"),
+  messageId: z.uuid(),
+  deletedAt: z.string(),
+});
+
+export type MessageRecallFrame = z.infer<typeof messageRecallSchema>;
+export type ChatFrame = ChatMessage | ChatControl | PresenceFrame | MessageStatusFrame | MessageRecallFrame;
 
 /* --------------------------- 客户端 → Worker (WebSocket) -------------------------- */
 
@@ -193,5 +211,32 @@ export function toDirectStatusPublishPayload(input: {
     status: input.status,
     readerId: input.readerId,
     readerRole: input.readerRole,
+  };
+}
+
+/** 便捷构造：消息撤回发布载荷（班级群聊） */
+export function toRecallPublishPayload(input: {
+  classId: string;
+  messageId: string;
+  deletedAt: Date;
+}): RecallPublishPayload {
+  return {
+    roomName: roomNameForClass(input.classId),
+    messageId: input.messageId,
+    deletedAt: input.deletedAt.toISOString(),
+  };
+}
+
+/** 便捷构造：消息撤回发布载荷（私信） */
+export function toDirectRecallPublishPayload(input: {
+  userAId: string;
+  userBId: string;
+  messageId: string;
+  deletedAt: Date;
+}): RecallPublishPayload {
+  return {
+    roomName: roomNameForDirect(input.userAId, input.userBId),
+    messageId: input.messageId,
+    deletedAt: input.deletedAt.toISOString(),
   };
 }

@@ -31,7 +31,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { relations, sql } from "drizzle-orm";
+import { desc, relations, sql } from "drizzle-orm";
 
 /* -------------------------------------------------------------------------- */
 /* 枚举                                                                        */
@@ -267,6 +267,14 @@ export const conversations = pgTable(
     index("conversations_class_idx").on(t.classId),
     index("conversations_participant_a_idx").on(t.participantAId),
     index("conversations_participant_b_idx").on(t.participantBId),
+    // 班级群聊唯一约束：每个班级只有一个群聊会话，防止并发创建重复
+    uniqueIndex("conversations_group_class_unique")
+      .on(t.classId)
+      .where(sql`${t.type} = 'group'`),
+    // 私信唯一约束：相同参与者对只有一个私信会话
+    uniqueIndex("conversations_direct_pair_unique")
+      .on(t.participantAId, t.participantBId)
+      .where(sql`${t.type} = 'direct'`),
   ],
 );
 
@@ -400,6 +408,8 @@ export const messages = pgTable(
   (t) => [
     index("messages_conversation_idx").on(t.conversationId),
     index("messages_created_at_idx").on(t.createdAt),
+    // 复合索引：支持游标分页查询 (conversationId, createdAt DESC)
+    index("messages_conv_created_idx").on(t.conversationId, desc(t.createdAt)),
   ],
 );
 
@@ -608,9 +618,8 @@ export const auditLogs = pgTable(
   "audit_logs",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+    // 审计日志应永久保留：用户删除时置 NULL 而非级联删除
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
     action: text("action").notNull(),
     targetType: text("target_type").notNull(),
     targetId: text("target_id"),

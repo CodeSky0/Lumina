@@ -18,12 +18,16 @@ export function DashboardTab() {
 
   useEffect(() => {
     let active = true;
-    void getDashboardStats().then((s) => {
-      if (active) {
-        setStats(s);
-        setLoading(false);
-      }
-    });
+    void getDashboardStats()
+      .then((s) => {
+        if (active) {
+          setStats(s);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (active) setLoading(false);
+      });
     return () => {
       active = false;
     };
@@ -45,6 +49,8 @@ export function DashboardTab() {
       const csv = await fn();
       if (csv) {
         downloadCSV(csv, `lumina-${type}-${new Date().toISOString().slice(0, 10)}.csv`);
+      } else {
+        alert("无数据可导出或权限不足");
       }
     });
   }

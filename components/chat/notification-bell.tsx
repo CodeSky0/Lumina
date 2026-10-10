@@ -40,24 +40,32 @@ export function NotificationBell({
 
   function handleMarkAllRead() {
     startTransition(async () => {
-      await markAllNotificationsRead();
-      setUnreadCount(0);
-      setNotifications((prev) =>
-        prev.map((n) => ({ ...n, readAt: new Date() })),
-      );
+      try {
+        await markAllNotificationsRead();
+        setUnreadCount(0);
+        setNotifications((prev) =>
+          prev.map((n) => ({ ...n, readAt: new Date() })),
+        );
+      } catch {
+        /* 乐观更新回滚由下次刷新修正 */
+      }
     });
   }
 
   function handleClickNotification(n: NotificationItem) {
     if (!n.readAt) {
       startTransition(async () => {
-        await markNotificationRead(n.id);
-        setUnreadCount((c) => Math.max(0, c - 1));
-        setNotifications((prev) =>
-          prev.map((item) =>
-            item.id === n.id ? { ...item, readAt: new Date() } : item,
-          ),
-        );
+        try {
+          await markNotificationRead(n.id);
+          setUnreadCount((c) => Math.max(0, c - 1));
+          setNotifications((prev) =>
+            prev.map((item) =>
+              item.id === n.id ? { ...item, readAt: new Date() } : item,
+            ),
+          );
+        } catch {
+          /* 乐观更新回滚由下次刷新修正 */
+        }
       });
     }
     if (n.conversationId && onSelectConversation) {

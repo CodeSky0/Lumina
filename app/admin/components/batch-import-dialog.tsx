@@ -95,6 +95,9 @@ export function BatchImportDialog({
     reader.onload = (ev) => {
       setText(String(ev.target?.result ?? ""));
     };
+    reader.onerror = () => {
+      show("error", "文件读取失败");
+    };
     reader.readAsText(file);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }

@@ -39,6 +39,7 @@ export function MessageInput({
   const audioChunksRef = useRef<Blob[]>([]);
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordStreamRef = useRef<MediaStream | null>(null);
+  const unmountedRef = useRef(false);
 
   const isGroup = conversationType === "group";
 
@@ -47,9 +48,14 @@ export function MessageInput({
 
   useEffect(() => {
     return () => {
+      unmountedRef.current = true;
       if (recordTimerRef.current) clearInterval(recordTimerRef.current);
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-        mediaRecorderRef.current.stop();
+      // 卸载时先清除 onstop 回调，防止异步发送消息到已卸载组件
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.onstop = null;
+        if (mediaRecorderRef.current.state !== "inactive") {
+          mediaRecorderRef.current.stop();
+        }
       }
       recordStreamRef.current?.getTracks().forEach((t) => t.stop());
     };
@@ -138,7 +144,8 @@ export function MessageInput({
       }
       if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
-        insertMention(filteredMembers[mentionIndex]!);
+        const target = filteredMembers[mentionIndex];
+        if (target) insertMention(target);
         return;
       }
       if (e.key === "Escape") {
@@ -157,6 +164,7 @@ export function MessageInput({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (pending) return;
     if (!text.trim() && !hasFile) return;
     setFeedback(null);
     const fd = new FormData();
@@ -260,6 +268,7 @@ export function MessageInput({
     const duration = recordDuration;
 
     recorder.onstop = () => {
+      if (unmountedRef.current) return;
       if (send && audioChunksRef.current.length > 0) {
         const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
         const ext = (recorder.mimeType || "audio/webm").includes("ogg") ? "ogg" : "webm";
@@ -269,12 +278,22 @@ export function MessageInput({
         fd.set("text", "");
         fd.set("file", file);
         fd.set("duration", String(duration));
+        // 语音消息也走乐观更新，保持体验一致
+        const tempId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const optimisticContent = JSON.stringify({ url: "", duration });
+        if (onOptimisticSend) onOptimisticSend(tempId, optimisticContent, "audio");
         startTransition(async () => {
           try {
             const res = await sendMessage(fd);
-            if (!res.ok) setFeedback(res.error);
+            if (res.ok) {
+              if (onSendConfirmed) onSendConfirmed(tempId, true, res.id, res.content);
+            } else {
+              setFeedback(res.error);
+              if (onSendConfirmed) onSendConfirmed(tempId, false);
+            }
           } catch {
             setFeedback("语音发送失败，请重试");
+            if (onSendConfirmed) onSendConfirmed(tempId, false);
           }
         });
       }
@@ -363,7 +382,8 @@ export function MessageInput({
             <button
               type="button"
               onClick={startRecording}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neutral-2 text-neutral-7 ring-1 ring-border transition-colors hover:bg-neutral-3"
+              disabled={pending || recording}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neutral-2 text-neutral-7 ring-1 ring-border transition-colors hover:bg-neutral-3 disabled:opacity-50"
               title="语音消息"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -34,7 +34,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const show = useCallback((type: ToastType, message: string) => {
     const id = Date.now() + Math.random();
-    setToasts((prev) => [...prev, { id, type, message }]);
+    // 限制最多 5 条 toast，防止堆积
+    setToasts((prev) => [...prev, { id, type, message }].slice(-5));
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 3000);

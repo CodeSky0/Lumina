@@ -15,8 +15,9 @@ if (process.env.VERCEL === "1") {
     console.log("✓ 数据库迁移完成");
   } catch {
     console.error(
-      "⚠ 数据库迁移失败，继续构建。请手动检查数据库状态。",
+      "✗ 数据库迁移失败，阻断构建以避免部署与 DB schema 不一致。请检查迁移脚本与数据库状态后重试。",
     );
+    process.exit(1);
   }
 } else {
   console.log(

@@ -19,12 +19,16 @@ export function AuditTab() {
 
   useEffect(() => {
     let active = true;
-    void getRecentAuditLogs(100).then((items) => {
-      if (active) {
-        setLogs(items);
-        setLoading(false);
-      }
-    });
+    void getRecentAuditLogs(100)
+      .then((items) => {
+        if (active) {
+          setLogs(items);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (active) setLoading(false);
+      });
     return () => {
       active = false;
     };
@@ -59,7 +63,7 @@ export function AuditTab() {
             <tbody>
               {logs.map((log) => (
                 <tr key={log.id} className="border-t border-border">
-                  <td className="px-4 py-2 text-neutral-9">{log.userName}</td>
+                  <td className="px-4 py-2 text-neutral-9">{log.userName ?? "（已删除用户）"}</td>
                   <td className="px-4 py-2 text-neutral-7">
                     {ACTION_LABELS[log.action] ?? log.action}
                   </td>

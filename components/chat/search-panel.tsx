@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { motion } from "motion/react";
 import { searchMessages, type SearchResult } from "@/lib/messages/actions";
 
@@ -15,19 +15,30 @@ export function SearchPanel({
   const [results, setResults] = useState<SearchResult[]>([]);
   const [pending, startTransition] = useTransition();
   const reqIdRef = useRef(0);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function handleSearch(value: string) {
     setQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     if (value.trim().length < 2) {
       setResults([]);
       return;
     }
-    const myId = ++reqIdRef.current;
-    startTransition(async () => {
-      const res = await searchMessages(value);
-      if (myId === reqIdRef.current) setResults(res);
-    });
+    // 300ms 防抖，避免快速输入时产生过多请求
+    debounceRef.current = setTimeout(() => {
+      const myId = ++reqIdRef.current;
+      startTransition(async () => {
+        const res = await searchMessages(value);
+        if (myId === reqIdRef.current) setResults(res);
+      });
+    }, 300);
   }
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   return (
     <motion.div

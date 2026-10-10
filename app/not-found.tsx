@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Button } from "@/components/ui";
 
 export default function NotFound() {
   return (
@@ -10,10 +9,11 @@ export default function NotFound() {
           页面不存在或已被移除
         </p>
       </div>
-      <Link href="/login">
-        <Button variant="primary" size="md">
-          返回登录
-        </Button>
+      <Link
+        href="/login"
+        className="rounded-lg bg-accent px-4 py-2 text-copy-14 font-medium text-white transition-colors hover:opacity-90"
+      >
+        返回登录
       </Link>
     </div>
   );

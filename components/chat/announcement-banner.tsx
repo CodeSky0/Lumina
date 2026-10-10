@@ -42,7 +42,9 @@ export function AnnouncementBanner({
 
   if (announcements.length === 0 && !isTeacher) return null;
 
-  const current = announcements[currentIdx];
+  // 防止公告数量减少后 currentIdx 越界
+  const safeIdx = announcements.length > 0 ? currentIdx % announcements.length : 0;
+  const current = announcements[safeIdx];
 
   function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -91,7 +93,7 @@ export function AnnouncementBanner({
                 <span
                   key={i}
                   className={`h-1.5 w-1.5 rounded-full transition-colors ${
-                    i === currentIdx ? "bg-accent" : "bg-neutral-4"
+                    i === safeIdx ? "bg-accent" : "bg-neutral-4"
                   }`}
                 />
               ))}

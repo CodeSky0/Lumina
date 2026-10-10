@@ -11,8 +11,8 @@ import {
   getClassroomClassId,
   ForbiddenError,
 } from "@/lib/rbac";
-import { toPublishPayload, toDirectPublishPayload, toStatusPublishPayload, toDirectStatusPublishPayload } from "@/lib/realtime/contract";
-import { publishMessage, publishMessageStatus } from "@/lib/realtime/publish";
+import { toPublishPayload, toDirectPublishPayload, toStatusPublishPayload, toDirectStatusPublishPayload, toRecallPublishPayload, toDirectRecallPublishPayload } from "@/lib/realtime/contract";
+import { publishMessage, publishMessageStatus, publishMessageRecall } from "@/lib/realtime/publish";
 import { createNotification } from "@/lib/notifications/internal";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { sanitizeAndTruncate, isFileSafe } from "@/lib/security/sanitize";
@@ -667,7 +667,7 @@ export async function sendMessage(
       const upload = await uploadImage(file);
       if (!upload.ok) return upload;
       content = upload.url;
-      type = urgent ? "urgent" : "image";
+      type = "image";
       mimeType = upload.mimeType;
     } else if (isAudio) {
       const upload = await uploadFile(file);
@@ -806,6 +806,12 @@ export async function getConversationMessages(
       )
     : eq(schema.messages.conversationId, conversationId);
 
+  // 校验游标时间有效性
+  if (beforeCursor) {
+    const cursorDate = new Date(beforeCursor);
+    if (Number.isNaN(cursorDate.getTime())) return [];
+  }
+
   const rows = await db
     .select({
       id: schema.messages.id,
@@ -942,20 +948,44 @@ export async function markConversationRead(
     return { ok: false, error: "权限校验失败" };
   }
 
+  const now = new Date();
   await db
     .insert(schema.messageReads)
     .values({
       userId: user.id,
       conversationId,
-      lastReadAt: new Date(),
+      lastReadAt: now,
     })
     .onConflictDoUpdate({
       target: [schema.messageReads.userId, schema.messageReads.conversationId],
       set: {
-        lastReadAt: new Date(),
-        updatedAt: new Date(),
+        lastReadAt: now,
+        updatedAt: now,
       },
     });
+
+  // 批量将该会话中他人发的 delivered 消息更新为 displayed，并推送状态变更
+  const updated = await db
+    .update(schema.messages)
+    .set({ status: "displayed" })
+    .where(
+      and(
+        eq(schema.messages.conversationId, conversationId),
+        ne(schema.messages.senderId, user.id),
+        eq(schema.messages.status, "delivered"),
+        isNull(schema.messages.deletedAt),
+      ),
+    )
+    .returning({ id: schema.messages.id });
+
+  const conversation = conv[0]!;
+  for (const m of updated) {
+    try {
+      await publishStatusEvent(conversation, m.id, "displayed", user);
+    } catch {
+      /* 推送失败不阻塞已读标记 */
+    }
+  }
 
   return { ok: true };
 }
@@ -990,6 +1020,11 @@ export async function setConversationPreferences(
   const values: { pinned?: boolean; muted?: boolean } = {};
   if (pinned !== undefined) values.pinned = pinned;
   if (muted !== undefined) values.muted = muted;
+
+  // 无更新字段时直接返回，避免空 INSERT 覆盖已有偏好
+  if (pinned === undefined && muted === undefined) {
+    return { ok: true };
+  }
 
   await db
     .insert(schema.conversationPreferences)
@@ -1051,10 +1086,47 @@ export async function recallMessage(
     return { ok: false, error: "无权操作此消息" };
   }
 
+  const now = new Date();
   await db
     .update(schema.messages)
-    .set({ deletedAt: new Date() })
+    .set({ deletedAt: now })
     .where(eq(schema.messages.id, messageId));
+
+  // 推送撤回事件，让其他客户端实时看到消息被撤回
+  try {
+    const conv = await db
+      .select()
+      .from(schema.conversations)
+      .where(eq(schema.conversations.id, msg.conversationId))
+      .limit(1);
+    if (conv.length > 0) {
+      const conversation = conv[0]!;
+      if (conversation.type === "group" && conversation.classId) {
+        await publishMessageRecall(
+          toRecallPublishPayload({
+            classId: conversation.classId,
+            messageId,
+            deletedAt: now,
+          }),
+        );
+      } else if (
+        conversation.type === "direct" &&
+        conversation.participantAId &&
+        conversation.participantBId
+      ) {
+        await publishMessageRecall(
+          toDirectRecallPublishPayload({
+            userAId: conversation.participantAId,
+            userBId: conversation.participantBId,
+            messageId,
+            deletedAt: now,
+          }),
+        );
+      }
+    }
+  } catch {
+    /* 推送失败不阻塞撤回操作 */
+  }
 
   return { ok: true };
 }
@@ -1103,14 +1175,20 @@ export async function editMessage(
   }
 
   const history = msg.editHistory ?? [];
-  history.push({ content: msg.content, editedAt: msg.editedAt?.toISOString() ?? new Date().toISOString() });
+  const now = new Date();
+  history.push({
+    content: msg.content,
+    editedAt: msg.editedAt?.toISOString() ?? msg.createdAt.toISOString(),
+  });
+  // 限制编辑历史最多保留 20 条，防止 JSONB 字段无限膨胀
+  const trimmedHistory = history.slice(-20);
 
   await db
     .update(schema.messages)
     .set({
       content: trimmed,
-      editedAt: new Date(),
-      editHistory: history,
+      editedAt: now,
+      editHistory: trimmedHistory,
     })
     .where(eq(schema.messages.id, messageId));
 
@@ -1135,6 +1213,9 @@ export async function searchMessages(query: string): Promise<SearchResult[]> {
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
 
+  // 转义 LIKE 通配符，防止搜索 % 或 _ 时匹配非预期内容
+  const escapedQuery = trimmed.replace(/[%_\\]/g, "\\$&");
+
   const conversations = await getMyConversations();
   const conversationIds = conversations.map((c) => c.conversationId);
   if (conversationIds.length === 0) return [];
@@ -1155,7 +1236,7 @@ export async function searchMessages(query: string): Promise<SearchResult[]> {
       and(
         inArray(schema.messages.conversationId, conversationIds),
         eq(schema.messages.type, "text"),
-        ilike(schema.messages.content, `%${trimmed}%`),
+        ilike(schema.messages.content, `%${escapedQuery}%`),
         isNull(schema.messages.deletedAt),
       ),
     )
@@ -1179,6 +1260,9 @@ async function assertCanAccessConversation(
   role: UserRole,
   conversation: { type: ConversationType; classId: string | null; participantAId: string | null; participantBId: string | null },
 ): Promise<void> {
+  // admin 拥有所有会话的访问权限（审计/管理需要）
+  if (role === "admin") return;
+
   if (conversation.type === "group" && conversation.classId) {
     if (role === "parent") {
       await assertParentCanPostToClass(userId, conversation.classId);
@@ -1238,6 +1322,27 @@ export async function getMyClasses(): Promise<MyClass[]> {
       .from(schema.teacherClasses)
       .innerJoin(schema.classes, eq(schema.teacherClasses.classId, schema.classes.id))
       .where(eq(schema.teacherClasses.teacherId, user.id));
+    return rows;
+  }
+  if (user.role === "classroom") {
+    const classId = await getClassroomClassId(user.id);
+    if (!classId) return [];
+    const rows = await db
+      .select({
+        classId: schema.classes.id,
+        className: schema.classes.name,
+      })
+      .from(schema.classes)
+      .where(eq(schema.classes.id, classId));
+    return rows;
+  }
+  if (user.role === "admin") {
+    const rows = await db
+      .select({
+        classId: schema.classes.id,
+        className: schema.classes.name,
+      })
+      .from(schema.classes);
     return rows;
   }
   return [];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { authClient } from "@/lib/auth/client";
 import {
@@ -40,25 +40,35 @@ export default function AdminPanel({ adminName }: AdminPanelProps) {
     [],
   );
 
-  async function refresh() {
-    const [u, s, c, tb, pb] = await Promise.all([
-      listUsers(),
-      listSubjects(),
-      listClasses(),
-      listTeacherClassBindings(),
-      listParentStudentBindings(),
-    ]);
-    setUsers(u);
-    setSubjects(s);
-    setClasses(c);
-    setTeacherBindings(tb);
-    setParentBindings(pb);
-  }
+  const refresh = useCallback(async () => {
+    try {
+      const results = await Promise.allSettled([
+        listUsers(),
+        listSubjects(),
+        listClasses(),
+        listTeacherClassBindings(),
+        listParentStudentBindings(),
+      ]);
+      if (results[0].status === "fulfilled") setUsers(results[0].value);
+      if (results[1].status === "fulfilled") setSubjects(results[1].value);
+      if (results[2].status === "fulfilled") setClasses(results[2].value);
+      if (results[3].status === "fulfilled") setTeacherBindings(results[3].value);
+      if (results[4].status === "fulfilled") setParentBindings(results[4].value);
+    } catch {
+      /* 静默处理，避免整个面板崩溃 */
+    }
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
     void refresh();
-  }, []);
+  }, [refresh]);
+
+  async function handleLogout() {
+    await authClient.signOut();
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- logout 后强制刷新清除所有客户端状态
+    window.location.href = "/admin/login";
+  }
 
   return (
     <ToastProvider>
@@ -67,7 +77,7 @@ export default function AdminPanel({ adminName }: AdminPanelProps) {
           activeTab={activeTab}
           onTabChange={setActiveTab}
           adminName={adminName}
-          onLogout={() => authClient.signOut()}
+          onLogout={handleLogout}
         />
         <main className="flex-1 overflow-x-auto p-6">
           <AnimatePresence mode="wait">

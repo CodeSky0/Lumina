@@ -37,6 +37,26 @@ function FileCard({ content }: { content: string }) {
   }
   if (!info) return null;
 
+  // 乐观更新时 url 为空，禁用链接避免跳转到当前页面
+  if (!info.url) {
+    return (
+      <div className="flex items-center gap-3 rounded-lg bg-white/10 px-3 py-2">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/20">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <path d="M14 2v6h6" />
+            <path d="M12 18v-6" />
+            <path d="m9 15 3 3 3-3" />
+          </svg>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-copy-14 font-medium">{info.name}</p>
+          <p className="text-caption-10 opacity-70">{formatFileSize(info.size)}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <a
       href={info.url}
@@ -69,10 +89,12 @@ function renderTextWithMentions(
     return <p className="whitespace-pre-wrap text-copy-14">{content}</p>;
   }
 
-  const escapedNames = mentions.map((m) => ({
-    ...m,
-    pattern: `@${m.name}`,
-  }));
+  const escapedNames = [...mentions]
+    .sort((a, b) => b.name.length - a.name.length)
+    .map((m) => ({
+      ...m,
+      pattern: `@${m.name}`,
+    }));
 
   const parts: React.ReactNode[] = [];
   let remaining = content;
@@ -119,6 +141,7 @@ function AudioPlayer({ content }: { content: string }) {
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [current, setCurrent] = useState(0);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -150,6 +173,10 @@ function AudioPlayer({ content }: { content: string }) {
   }
   if (!info) return null;
 
+  if (error) {
+    return <p className="text-copy-14 opacity-70">语音播放失败，请重试</p>;
+  }
+
   function togglePlay() {
     const audio = audioRef.current;
     if (!audio) return;
@@ -157,7 +184,10 @@ function AudioPlayer({ content }: { content: string }) {
       audio.pause();
       setPlaying(false);
     } else {
-      void audio.play();
+      audio.play().catch(() => {
+        setPlaying(false);
+        setError(true);
+      });
       setPlaying(true);
     }
   }
@@ -409,6 +439,16 @@ export function MessageBubble({
                   src={msg.content}
                   alt="图片消息"
                   className="max-h-60 rounded-lg"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                    const parent = e.currentTarget.parentElement;
+                    if (parent && !parent.querySelector(".img-error-msg")) {
+                      const p = document.createElement("p");
+                      p.className = "img-error-msg text-copy-14 opacity-70";
+                      p.textContent = "图片加载失败";
+                      parent.appendChild(p);
+                    }
+                  }}
                 />
               ) : msg.type === "audio" ? (
                 <AudioPlayer content={msg.content} />

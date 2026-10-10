@@ -54,8 +54,8 @@ export function PushSubscribe() {
 
       const res = await subscribeToPush(sub.toJSON());
       if (res.ok) setSubscribed(true);
-    } catch {
-      /* ignore */
+    } catch (err) {
+      console.error("推送订阅失败:", err instanceof Error ? err.message : err);
     } finally {
       setLoading(false);
     }

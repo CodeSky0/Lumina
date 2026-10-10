@@ -91,9 +91,13 @@ export function ChatLayout({
 
     async function loadLatest() {
       const msgs = await getConversationMessages(selectedId!);
-      if (active) {
-        setMessages(msgs);
-      }
+      if (!active) return;
+      // 合并而非覆盖：保留尚未确认的乐观消息，避免 WS 实时消息被覆盖丢失
+      setMessages((prev) => {
+        const serverIds = new Set(msgs.map((m) => m.id));
+        const optimistic = prev.filter((m) => m.id.startsWith("optimistic-") && !serverIds.has(m.id));
+        return [...msgs, ...optimistic];
+      });
     }
 
     void loadLatest();
@@ -197,6 +201,10 @@ export function ChatLayout({
     setMessages((prev) =>
       prev.map((m) => {
         if (m.id !== tempId) return m;
+        // 释放乐观图片的 Object URL，防止内存泄漏
+        if (m.type === "image" && m.content.startsWith("blob:")) {
+          URL.revokeObjectURL(m.content);
+        }
         if (!ok) return { ...m, status: "pending" as const };
         return { ...m, id: realId ?? tempId, status: "delivered" as const, content: content ?? m.content };
       }),

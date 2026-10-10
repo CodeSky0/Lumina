@@ -71,6 +71,18 @@ interface StatusPublishPayload {
   readerRole: "parent" | "teacher" | "classroom" | "admin";
 }
 
+interface RecallPublishPayload {
+  roomName: string;
+  messageId: string;
+  deletedAt: string;
+}
+
+interface MessageRecallFrame {
+  kind: "message-recall";
+  messageId: string;
+  deletedAt: string;
+}
+
 interface MessageStatusFrame {
   kind: "message-status";
   messageId: string;
@@ -90,6 +102,8 @@ export class RoomDO implements DurableObject {
   private readonly recent: ChatMessage[] = [];
   private readonly presence = new Map<string, PresenceUser>();
   private readonly wsToUserId = new Map<WebSocket, string>();
+  // 引用计数：同一用户多连接时，只在所有连接关闭后才从 presence 移除
+  private readonly userIdToSockets = new Map<string, Set<WebSocket>>();
 
   constructor(state: DurableObjectState, _env: Env) {
     this.state = state;
@@ -104,6 +118,10 @@ export class RoomDO implements DurableObject {
 
     if (url.pathname === "/publish-status" && request.method === "POST") {
       return this.handlePublishStatus(request);
+    }
+
+    if (url.pathname === "/publish-recall" && request.method === "POST") {
+      return this.handlePublishRecall(request);
     }
 
     if (request.headers.get("Upgrade") === "websocket") {
@@ -201,6 +219,39 @@ export class RoomDO implements DurableObject {
     return new Response("OK", { status: 200 });
   }
 
+  private async handlePublishRecall(request: Request): Promise<Response> {
+    let payload: RecallPublishPayload;
+    try {
+      payload = (await request.json()) as RecallPublishPayload;
+    } catch {
+      return new Response("Invalid JSON", { status: 400 });
+    }
+    if (
+      typeof payload.messageId !== "string" ||
+      typeof payload.deletedAt !== "string"
+    ) {
+      return new Response("Bad Request", { status: 400 });
+    }
+
+    const frame: MessageRecallFrame = {
+      kind: "message-recall",
+      messageId: payload.messageId,
+      deletedAt: payload.deletedAt,
+    };
+
+    const sockets = this.state.getWebSockets();
+    const data = JSON.stringify(frame);
+    for (const ws of sockets) {
+      try {
+        ws.send(data);
+      } catch {
+        // 单个 socket 发送失败不影响其他
+      }
+    }
+
+    return new Response("OK", { status: 200 });
+  }
+
   private handleWebSocket(): Response {
     const pair = new WebSocketPair();
     const server = pair[0];
@@ -243,6 +294,13 @@ export class RoomDO implements DurableObject {
       };
       this.presence.set(user.userId, user);
       this.wsToUserId.set(ws, user.userId);
+      // 引用计数：记录该用户的每个 WebSocket 连接
+      let sockets = this.userIdToSockets.get(user.userId);
+      if (!sockets) {
+        sockets = new Set();
+        this.userIdToSockets.set(user.userId, sockets);
+      }
+      sockets.add(ws);
       this.broadcastPresence();
       return;
     }
@@ -283,16 +341,31 @@ export class RoomDO implements DurableObject {
     _reason: string,
     _wasClean: boolean,
   ): Promise<void> {
-    const userId = this.wsToUserId.get(ws);
-    if (userId) {
-      this.presence.delete(userId);
-      this.wsToUserId.delete(ws);
-      this.broadcastPresence();
-    }
+    this.cleanupSocket(ws);
   }
 
-  async webSocketError(_ws: WebSocket, _error: unknown): Promise<void> {
-    // 同上
+  async webSocketError(ws: WebSocket, _error: unknown): Promise<void> {
+    // 错误时也清理 presence，防止用户永远显示在线
+    this.cleanupSocket(ws);
+  }
+
+  private cleanupSocket(ws: WebSocket): void {
+    const userId = this.wsToUserId.get(ws);
+    if (!userId) return;
+    this.wsToUserId.delete(ws);
+
+    // 引用计数：只在所有连接关闭后才从 presence 移除
+    const sockets = this.userIdToSockets.get(userId);
+    if (sockets) {
+      sockets.delete(ws);
+      if (sockets.size === 0) {
+        this.userIdToSockets.delete(userId);
+        this.presence.delete(userId);
+      }
+    } else {
+      this.presence.delete(userId);
+    }
+    this.broadcastPresence();
   }
 }
 
@@ -326,6 +399,27 @@ export default {
     }
 
     if (url.pathname === "/publish-status" && request.method === "POST") {
+      const auth = request.headers.get("Authorization");
+      if (!auth || auth !== `Bearer ${env.LUMINA_API_TOKEN}`) {
+        return new Response("Unauthorized", { status: 401 });
+      }
+      const upstream = request.clone();
+      let roomName: unknown;
+      try {
+        const body = (await request.json()) as { roomName?: unknown };
+        roomName = body.roomName;
+      } catch {
+        return new Response("Invalid JSON", { status: 400 });
+      }
+      if (typeof roomName !== "string" || roomName.length === 0) {
+        return new Response("Missing roomName", { status: 400 });
+      }
+      const id = env.ROOM.idFromName(roomName);
+      const stub = env.ROOM.get(id);
+      return stub.fetch(upstream);
+    }
+
+    if (url.pathname === "/publish-recall" && request.method === "POST") {
       const auth = request.headers.get("Authorization");
       if (!auth || auth !== `Bearer ${env.LUMINA_API_TOKEN}`) {
         return new Response("Unauthorized", { status: 401 });

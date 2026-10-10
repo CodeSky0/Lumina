@@ -39,7 +39,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const handleClick = useCallback(
       (e: React.MouseEvent<HTMLButtonElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
-        const id = Date.now();
+        const id = Date.now() + Math.random();
         setRipples((prev) => [
           ...prev,
           { id, x: e.clientX - rect.left, y: e.clientY - rect.top },

@@ -75,7 +75,10 @@ export async function createAnnouncement(
   const { classId, title, content } = parsed.data;
 
   try {
-    await assertTeacherCanPostToClass(user.id, classId);
+    if (user.role === "teacher") {
+      await assertTeacherCanPostToClass(user.id, classId);
+    }
+    // admin 直接放行
   } catch (err) {
     if (err instanceof ForbiddenError) {
       return { ok: false, error: err.message };
@@ -146,6 +149,18 @@ export async function deleteAnnouncement(
 
   if (user.role !== "admin" && ann.createdBy !== user.id) {
     return { ok: false, error: "只能删除自己发布的公告" };
+  }
+
+  // 教师删除时校验是否仍绑定该班级（admin 放行）
+  if (user.role === "teacher") {
+    try {
+      await assertTeacherCanPostToClass(user.id, ann.classId);
+    } catch (err) {
+      if (err instanceof ForbiddenError) {
+        return { ok: false, error: "你已无权管理该班级" };
+      }
+      return { ok: false, error: "权限校验失败" };
+    }
   }
 
   await db

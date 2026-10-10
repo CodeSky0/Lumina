@@ -18,7 +18,13 @@ export function Dialog({ open, onClose, title, children, className = "" }: Dialo
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    // 锁定背景滚动
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", handler);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [open, onClose]);
 
   return (
@@ -33,6 +39,9 @@ export function Dialog({ open, onClose, title, children, className = "" }: Dialo
           transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
         >
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
             className={`w-full max-w-md space-y-4 rounded-xl bg-neutral-2 p-6 ring-1 ring-border ${className}`}
             onClick={(e) => e.stopPropagation()}
             initial={{ opacity: 0, scale: 0.95 }}

@@ -15,6 +15,7 @@ import sharp from "sharp";
 import { randomUUID } from "node:crypto";
 import { getEnv } from "@/lib/env";
 import { getCurrentSession } from "@/lib/auth/session";
+import { isFileSafe, sanitizeExtension } from "@/lib/security/sanitize";
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 const ACCEPTED_MIME = new Set([
@@ -98,10 +99,15 @@ export async function uploadFile(file: File): Promise<UploadFileResult> {
   }
   const mime = file.type.toLowerCase() || "application/octet-stream";
 
+  // 安全校验：拒绝危险扩展名与 MIME 类型（防止上传 HTML/SVG/EXE 等触发存储型 XSS）
+  if (!isFileSafe(file.name, mime)) {
+    return { ok: false, error: "文件类型不安全，已被拒绝" };
+  }
+
   const env = getEnv();
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  const ext = file.name.split(".").pop() || "bin";
+  const ext = sanitizeExtension(file.name);
   const filename = `msg-${randomUUID()}.${ext}`;
   const blob = await put(filename, buffer, {
     access: "public",

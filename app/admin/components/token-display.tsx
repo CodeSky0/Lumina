@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Dialog } from "@/components/ui";
 import { Button } from "@/components/ui";
 import type { CreatedUser } from "@/lib/admin/actions";
@@ -20,11 +20,22 @@ interface TokenDisplayProps {
 
 export function TokenDisplay({ created, onClose, mode = "create" }: TokenDisplayProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   function copy(text: string, field: string) {
-    navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000);
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedField(field);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setCopiedField(null), 2000);
+    }).catch(() => {
+      setCopiedField(null);
+    });
   }
 
   const title = mode === "reset" ? "Token 已重置" : "用户创建成功";

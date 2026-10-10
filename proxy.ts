@@ -1,6 +1,6 @@
 /**
  * 路由保护代理 (Next.js 16 proxy 约定) — 粗粒度校验：
- *   - 公开路由放行（/login, /admin/login, /api/auth/*, 静态资源）
+ *   - 公开路由放行（/login, /admin/login, /about, /api/auth/*, /api/cron/*, /api/health, 静态资源）
  *   - 其余路由要求存在 Better-Auth 会话 Cookie，否则重定向至 /login
  *
  * 角色细粒度（parent/teacher/classroom/admin）由各端 Server Component/Server Action
@@ -9,13 +9,18 @@
 import { getSessionCookie } from "better-auth/cookies";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/admin/login"];
+const PUBLIC_PATHS = ["/login", "/admin/login", "/about"];
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Better-Auth API 端点放行
   if (pathname.startsWith("/api/auth")) {
+    return NextResponse.next();
+  }
+
+  // Cron Job 与健康检查端点放行（由各路由内部 Bearer token 校验）
+  if (pathname.startsWith("/api/cron") || pathname === "/api/health") {
     return NextResponse.next();
   }
 

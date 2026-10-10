@@ -15,6 +15,7 @@ import {
 
 const MAX_QUEUED = 200;
 const RECONNECT_DELAY = 3000;
+const HEARTBEAT_INTERVAL = 30000;
 
 export type MessageStatusUpdate = {
   messageId: string;
@@ -49,6 +50,7 @@ export function useChatWs(
     if (!wsUrl) return;
     let closed = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
     let ws: WebSocket | null = null;
 
     function connect() {
@@ -73,6 +75,12 @@ export function useChatWs(
             }),
           );
         }
+        // 心跳机制：定期发送 ping 检测半开连接
+        heartbeatTimer = setInterval(() => {
+          if (ws?.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ kind: "ping" }));
+          }
+        }, HEARTBEAT_INTERVAL);
       };
       ws.onmessage = (ev) => {
         let raw: unknown;
@@ -102,8 +110,17 @@ export function useChatWs(
             }
           }
           if (msgs.length > 0) {
-            lastCreatedAt.current = msgs[msgs.length - 1]!.createdAt;
-            setMessages((prev) => [...prev, ...msgs].slice(-MAX_QUEUED));
+            // 去重：过滤掉已存在的消息，防止重连后重复显示
+            setMessages((prev) => {
+              const existingIds = new Set(prev.map((m) => m.messageId));
+              const deduped = msgs.filter((m) => !existingIds.has(m.messageId));
+              if (deduped.length === 0) return prev;
+              const newest = deduped[deduped.length - 1]!.createdAt;
+              if (!lastCreatedAt.current || newest > lastCreatedAt.current) {
+                lastCreatedAt.current = newest;
+              }
+              return [...prev, ...deduped].slice(-MAX_QUEUED);
+            });
           }
         } else if (frame.kind === "presence") {
           try {
@@ -129,15 +146,22 @@ export function useChatWs(
       ws.onclose = () => {
         setConnected(false);
         setPresence([]);
+        if (heartbeatTimer) {
+          clearInterval(heartbeatTimer);
+          heartbeatTimer = null;
+        }
         if (!closed) timer = setTimeout(connect, RECONNECT_DELAY);
       };
-      ws.onerror = () => ws?.close();
+      ws.onerror = () => {
+        if (ws?.readyState !== WebSocket.CLOSED) ws?.close();
+      };
     }
 
     connect();
     return () => {
       closed = true;
       if (timer) clearTimeout(timer);
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
       if (ws) {
         ws.onclose = null;
         ws.close();

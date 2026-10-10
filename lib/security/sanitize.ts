@@ -38,8 +38,9 @@ export function sanitizeAndTruncate(input: string, maxLength: number): string {
  * 校验文件上传安全性 — 检查文件扩展名和 MIME 类型。
  */
 const DANGEROUS_EXTENSIONS = new Set([
-  "exe", "bat", "cmd", "com", "scr", "vbs", "js", "jar",
+  "exe", "bat", "cmd", "com", "scr", "vbs", "js", "mjs", "jar",
   "php", "asp", "aspx", "jsp", "py", "rb", "pl", "sh",
+  "html", "htm", "svg", "xml", "xhtml", "swf", "hta", "wsf",
 ]);
 
 const DANGEROUS_MIME = new Set([
@@ -48,6 +49,11 @@ const DANGEROUS_MIME = new Set([
   "application/x-executable",
   "text/javascript",
   "application/javascript",
+  "text/html",
+  "image/svg+xml",
+  "application/xml",
+  "application/xhtml+xml",
+  "text/xml",
 ]);
 
 export function isFileSafe(filename: string, mimeType: string): boolean {
@@ -55,4 +61,13 @@ export function isFileSafe(filename: string, mimeType: string): boolean {
   if (DANGEROUS_EXTENSIONS.has(ext)) return false;
   if (DANGEROUS_MIME.has(mimeType.toLowerCase())) return false;
   return true;
+}
+
+/**
+ * 清理文件扩展名 — 只保留字母数字，限制长度，防止路径遍历与特殊字符。
+ */
+export function sanitizeExtension(filename: string): string {
+  const ext = filename.split(".").pop() ?? "";
+  const cleaned = ext.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8).toLowerCase();
+  return cleaned || "bin";
 }

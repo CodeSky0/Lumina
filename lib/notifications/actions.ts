@@ -2,7 +2,7 @@
 
 import { getCurrentSession } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 export type NotificationItem = {
   id: string;
@@ -46,7 +46,7 @@ export async function getUnreadNotificationCount(): Promise<number> {
     if (!session) return 0;
 
     const rows = await db
-      .select({ id: schema.notifications.id })
+      .select({ count: sql<number>`count(*)::int` })
       .from(schema.notifications)
       .where(
         and(
@@ -55,7 +55,7 @@ export async function getUnreadNotificationCount(): Promise<number> {
         ),
       );
 
-    return rows.length;
+    return rows[0]?.count ?? 0;
   } catch {
     return 0;
   }

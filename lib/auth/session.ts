@@ -51,7 +51,7 @@ export async function requireUser(role?: UserRole): Promise<SessionUser> {
     throw new Error("UNAUTHORIZED");
   }
   if (role && session.user.role !== role) {
-    throw new Error(`FORBIDDEN:需要 ${role} 角色`);
+    throw new Error("FORBIDDEN");
   }
   return session.user;
 }
