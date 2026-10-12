@@ -21,10 +21,16 @@ export function NotificationBell({
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
-    startTransition(async () => {
-      const count = await getUnreadNotificationCount();
-      setUnreadCount(count);
-    });
+    const refresh = () => {
+      if (document.hidden) return;
+      startTransition(async () => {
+        const count = await getUnreadNotificationCount();
+        setUnreadCount(count);
+      });
+    };
+    refresh();
+    const interval = setInterval(refresh, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   function handleOpen() {

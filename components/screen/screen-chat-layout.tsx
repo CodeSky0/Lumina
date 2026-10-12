@@ -7,6 +7,7 @@ import { AnnouncementBanner } from "@/components/chat/announcement-banner";
 import { MessageInput } from "@/components/chat/message-input";
 import {
   getConversationMessages,
+  getMessagesSince,
   markMessageRead,
   type ClassMessage,
 } from "@/lib/messages/actions";
@@ -33,6 +34,10 @@ export function ScreenChatLayout({
   const [selectedKey, setSelectedKey] = useState<string>("all");
   const [messages, setMessages] = useState<ClassMessage[]>([]);
   const reportedRef = useRef(new Set<string>());
+  const messagesRef = useRef<ClassMessage[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const wsUrl = cfWorkerUrl
     ? `${cfWorkerUrl.replace(/\/$/, "").replace(/^http/, "ws")}/ws/${roomNameForClass(classId)}`
@@ -48,24 +53,62 @@ export function ScreenChatLayout({
         ),
       );
     },
+    (recall) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === recall.messageId
+            ? { ...m, deletedAt: new Date(recall.deletedAt), content: "", editHistory: null }
+            : m,
+        ),
+      );
+    },
   );
 
   useEffect(() => {
     let active = true;
-    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function loadLatest() {
-      const msgs = await getConversationMessages(conversationId);
-      if (active) setMessages(msgs);
+      if (!active) return;
+      const currentMsgs = messagesRef.current;
+      if (currentMsgs.length === 0) {
+        const msgs = await getConversationMessages(conversationId);
+        if (active) setMessages(msgs);
+      } else {
+        const since = currentMsgs[0]!.createdAt.toISOString();
+        const msgs = await getMessagesSince(conversationId, since);
+        if (!active || msgs.length === 0) return;
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const newMsgs = msgs.filter((m) => !existingIds.has(m.id));
+          if (newMsgs.length === 0) return prev;
+          return [...newMsgs, ...prev];
+        });
+      }
     }
 
     void loadLatest();
 
     if (!connected) {
-      pollTimer = setInterval(() => {
-        if (document.hidden) return;
-        void loadLatest();
-      }, 5000);
+      let backoff = 5000;
+      const MAX_BACKOFF = 60000;
+      const poll = () => {
+        if (!active) return;
+        if (document.hidden) {
+          pollTimer = setTimeout(poll, backoff);
+          return;
+        }
+        void loadLatest().then(() => {
+          if (!active) return;
+          backoff = 5000;
+          pollTimer = setTimeout(poll, backoff);
+        }).catch(() => {
+          if (!active) return;
+          backoff = Math.min(backoff * 2, MAX_BACKOFF);
+          pollTimer = setTimeout(poll, backoff);
+        });
+      };
+      pollTimer = setTimeout(poll, backoff);
     }
 
     function onVisibilityChange() {
@@ -75,7 +118,7 @@ export function ScreenChatLayout({
 
     return () => {
       active = false;
-      if (pollTimer) clearInterval(pollTimer);
+      if (pollTimer) clearTimeout(pollTimer);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [conversationId, connected]);

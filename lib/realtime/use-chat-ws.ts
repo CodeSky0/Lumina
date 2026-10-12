@@ -9,6 +9,7 @@ import {
   chatMessageSchema,
   presenceFrameSchema,
   messageStatusSchema,
+  messageRecallSchema,
   type ChatMessage,
   type PresenceUser,
 } from "./contract";
@@ -24,10 +25,16 @@ export type MessageStatusUpdate = {
   readerRole: string;
 };
 
+export type MessageRecallUpdate = {
+  messageId: string;
+  deletedAt: string;
+};
+
 export function useChatWs(
   wsUrl: string | null,
   userInfo?: { userId: string; name: string; role: "parent" | "teacher" | "classroom" | "admin" },
   onStatusChange?: (update: MessageStatusUpdate) => void,
+  onRecall?: (update: MessageRecallUpdate) => void,
 ): {
   messages: ChatMessage[];
   connected: boolean;
@@ -38,8 +45,12 @@ export function useChatWs(
   const [presence, setPresence] = useState<PresenceUser[]>([]);
   const lastCreatedAt = useRef<string | null>(null);
   const statusCbRef = useRef(onStatusChange);
+  const recallCbRef = useRef(onRecall);
   useEffect(() => {
     statusCbRef.current = onStatusChange;
+  });
+  useEffect(() => {
+    recallCbRef.current = onRecall;
   });
 
   useEffect(() => {
@@ -137,6 +148,16 @@ export function useChatWs(
               status: sf.status,
               readerId: sf.readerId,
               readerRole: sf.readerRole,
+            });
+          } catch {
+            /* ignore invalid */
+          }
+        } else if (frame.kind === "message-recall") {
+          try {
+            const rf = messageRecallSchema.parse(raw);
+            recallCbRef.current?.({
+              messageId: rf.messageId,
+              deletedAt: rf.deletedAt,
             });
           } catch {
             /* ignore invalid */

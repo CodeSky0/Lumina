@@ -11,8 +11,8 @@ import {
   getClassroomClassId,
   ForbiddenError,
 } from "@/lib/rbac";
-import { toPublishPayload, toDirectPublishPayload, toStatusPublishPayload, toDirectStatusPublishPayload, toRecallPublishPayload, toDirectRecallPublishPayload } from "@/lib/realtime/contract";
-import { publishMessage, publishMessageStatus, publishMessageRecall } from "@/lib/realtime/publish";
+import { toPublishPayload, toDirectPublishPayload, toStatusPublishPayload, toDirectStatusPublishPayload, toRecallPublishPayload, toDirectRecallPublishPayload, toUserMessageEvent, messagePreview } from "@/lib/realtime/contract";
+import { publishMessage, publishMessageStatus, publishMessageRecall, publishUserMessageEvent } from "@/lib/realtime/publish";
 import { createNotification } from "@/lib/notifications/internal";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { sanitizeAndTruncate, isFileSafe } from "@/lib/security/sanitize";
@@ -756,6 +756,26 @@ export async function sendMessage(
     );
   }
 
+  try {
+    const memberIds = await getConversationMemberIds(conversation, user.id);
+    if (memberIds.length > 0) {
+      await publishUserMessageEvent({
+        userIds: memberIds,
+        event: toUserMessageEvent({
+          conversationId,
+          messageId: msg.id,
+          senderName: user.name,
+          senderRole: user.role,
+          preview: messagePreview(type, content),
+          type,
+          createdAt: msg.createdAt,
+        }),
+      });
+    }
+  } catch {
+    /* user event 推送失败不阻断发送 */
+  }
+
   return { ok: true, id: msg.id, status: "delivered", content };
 }
 
@@ -836,6 +856,108 @@ export async function getConversationMessages(
   return rows.map((r) =>
     r.deletedAt ? { ...r, content: "", editHistory: null } : r,
   );
+}
+
+/* ------------------------------ 增量拉取（断线补发） ------------------------------ */
+
+/**
+ * 增量拉取某会话中他人发的消息（createdAt > afterCreatedAt）。
+ * 用于 WS 断线重连后从 DB 补发，不依赖 DO 内存 backfill。
+ */
+export async function getMessagesSince(
+  conversationId: string,
+  afterCreatedAt?: string,
+): Promise<ClassMessage[]> {
+  const session = await getCurrentSession();
+  if (!session) return [];
+  const user = session.user;
+
+  const conv = await db
+    .select()
+    .from(schema.conversations)
+    .where(eq(schema.conversations.id, conversationId))
+    .limit(1);
+  if (conv.length === 0) return [];
+  const conversation = conv[0]!;
+
+  try {
+    await assertCanAccessConversation(user.id, user.role, conversation);
+  } catch {
+    return [];
+  }
+
+  const conditions = [
+    eq(schema.messages.conversationId, conversationId),
+    ne(schema.messages.senderId, user.id),
+  ];
+  if (afterCreatedAt) {
+    const afterDate = new Date(afterCreatedAt);
+    if (!Number.isNaN(afterDate.getTime())) {
+      conditions.push(gt(schema.messages.createdAt, afterDate));
+    }
+  }
+
+  const rows = await db
+    .select({
+      id: schema.messages.id,
+      senderName: schema.users.name,
+      senderRole: schema.users.role,
+      senderId: schema.messages.senderId,
+      content: schema.messages.content,
+      type: schema.messages.type,
+      mimeType: schema.messages.mimeType,
+      status: schema.messages.status,
+      deletedAt: schema.messages.deletedAt,
+      editedAt: schema.messages.editedAt,
+      editHistory: schema.messages.editHistory,
+      mentions: schema.messages.mentions,
+      createdAt: schema.messages.createdAt,
+    })
+    .from(schema.messages)
+    .innerJoin(schema.users, eq(schema.messages.senderId, schema.users.id))
+    .where(and(...conditions))
+    .orderBy(desc(schema.messages.createdAt))
+    .limit(100);
+
+  return rows.map((r) =>
+    r.deletedAt ? { ...r, content: "", editHistory: null } : r,
+  );
+}
+
+/** 查询会话中所有成员 ID（排除发送者），用于 user-level 事件推送 */
+async function getConversationMemberIds(
+  conversation: { type: ConversationType; classId: string | null; participantAId: string | null; participantBId: string | null },
+  senderId: string,
+): Promise<string[]> {
+  if (conversation.type === "group" && conversation.classId) {
+    const teachers = await db
+      .select({ id: schema.users.id })
+      .from(schema.teacherClasses)
+      .innerJoin(schema.users, eq(schema.teacherClasses.teacherId, schema.users.id))
+      .where(eq(schema.teacherClasses.classId, conversation.classId));
+    const parents = await db
+      .select({ id: schema.users.id })
+      .from(schema.parentStudents)
+      .innerJoin(schema.users, eq(schema.parentStudents.parentId, schema.users.id))
+      .where(eq(schema.parentStudents.classId, conversation.classId));
+    const classroom = await db
+      .select({ id: schema.classes.screenId })
+      .from(schema.classes)
+      .where(eq(schema.classes.id, conversation.classId))
+      .limit(1);
+    const ids = new Set<string>();
+    for (const t of teachers) if (t.id !== senderId) ids.add(t.id);
+    for (const p of parents) if (p.id !== senderId) ids.add(p.id);
+    if (classroom[0]?.id && classroom[0].id !== senderId) ids.add(classroom[0].id);
+    return [...ids];
+  }
+  if (conversation.type === "direct") {
+    const ids: string[] = [];
+    if (conversation.participantAId && conversation.participantAId !== senderId) ids.push(conversation.participantAId);
+    if (conversation.participantBId && conversation.participantBId !== senderId) ids.push(conversation.participantBId);
+    return ids;
+  }
+  return [];
 }
 
 /* ------------------------------ 消息状态上报 ------------------------------ */

@@ -240,3 +240,104 @@ export function toDirectRecallPublishPayload(input: {
     deletedAt: input.deletedAt.toISOString(),
   };
 }
+
+/* --------------------------- User-level 事件通道 -------------------------- */
+/**
+ * 用户级事件通道 — 每用户一个独立 WS room，用于实时推送未读计数/通知事件。
+ * 与会话级 room（class-xxx / dm-xxx）并行：会话 room 推全量消息，user room 推轻量事件。
+ */
+
+/** 用户级事件房间名 */
+export function roomNameForUser(userId: string): string {
+  return `user-${userId}`;
+}
+
+/** 用户级新消息事件帧（Worker → 客户端） */
+export const userMessageEventSchema = z.object({
+  kind: z.literal("user-message"),
+  conversationId: z.uuid(),
+  messageId: z.uuid(),
+  senderName: z.string(),
+  senderRole: z.enum(["parent", "teacher", "classroom", "admin"]),
+  preview: z.string(),
+  type: z.enum(["text", "image", "urgent", "file", "audio"]),
+  createdAt: z.string(),
+});
+
+export type UserMessageEvent = z.infer<typeof userMessageEventSchema>;
+
+/** 用户级通知事件帧（Worker → 客户端） */
+export const userNotificationEventSchema = z.object({
+  kind: z.literal("user-notification"),
+  notificationId: z.uuid(),
+  title: z.string(),
+  body: z.string().nullable(),
+  conversationId: z.string().nullable(),
+});
+
+export type UserNotificationEvent = z.infer<typeof userNotificationEventSchema>;
+
+/** 用户级事件联合类型 */
+export type UserEvent = UserMessageEvent | UserNotificationEvent;
+
+/** 用户级事件批量推送载荷（Next.js → Worker） */
+export const userEventPublishPayloadSchema = z.object({
+  userIds: z.array(z.string()).min(1),
+  event: z.union([userMessageEventSchema, userNotificationEventSchema]),
+});
+
+export type UserEventPublishPayload = z.infer<typeof userEventPublishPayloadSchema>;
+
+/** 便捷构造：新消息事件 */
+export function toUserMessageEvent(input: {
+  conversationId: string;
+  messageId: string;
+  senderName: string;
+  senderRole: UserRole;
+  preview: string;
+  type: MessageType;
+  createdAt: Date;
+}): UserMessageEvent {
+  return {
+    kind: "user-message",
+    conversationId: input.conversationId,
+    messageId: input.messageId,
+    senderName: input.senderName,
+    senderRole: input.senderRole,
+    preview: input.preview,
+    type: input.type,
+    createdAt: input.createdAt.toISOString(),
+  };
+}
+
+/** 便捷构造：通知事件 */
+export function toUserNotificationEvent(input: {
+  notificationId: string;
+  title: string;
+  body: string | null;
+  conversationId: string | null;
+}): UserNotificationEvent {
+  return {
+    kind: "user-notification",
+    notificationId: input.notificationId,
+    title: input.title,
+    body: input.body,
+    conversationId: input.conversationId,
+  };
+}
+
+/** 消息预览文本（用于侧边栏 lastMessagePreview / user 事件 preview） */
+export function messagePreview(type: MessageType, content: string): string {
+  switch (type) {
+    case "image":
+      return "[图片]";
+    case "audio":
+      return "[语音]";
+    case "file":
+      return "[文件]";
+    case "urgent":
+      return "[紧急] " + content.slice(0, 50);
+    default:
+      return content.slice(0, 50);
+  }
+}

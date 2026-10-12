@@ -91,6 +91,11 @@ interface MessageStatusFrame {
   readerRole: "parent" | "teacher" | "classroom" | "admin";
 }
 
+/** 用户级事件（新消息/通知），用于 user-{userId} 通道广播 */
+type UserEvent =
+  | { kind: "user-message"; conversationId: string; messageId: string; senderName: string; senderRole: string; preview: string; type: string; createdAt: string }
+  | { kind: "user-notification"; notificationId: string; title: string; body: string | null; conversationId: string | null };
+
 const RECENT_LIMIT = 50;
 
 /* -------------------------------------------------------------------------- */
@@ -122,6 +127,10 @@ export class RoomDO implements DurableObject {
 
     if (url.pathname === "/publish-recall" && request.method === "POST") {
       return this.handlePublishRecall(request);
+    }
+
+    if (url.pathname === "/publish-user-event" && request.method === "POST") {
+      return this.handlePublishUserEvent(request);
     }
 
     if (request.headers.get("Upgrade") === "websocket") {
@@ -252,6 +261,30 @@ export class RoomDO implements DurableObject {
     return new Response("OK", { status: 200 });
   }
 
+  private async handlePublishUserEvent(request: Request): Promise<Response> {
+    let event: UserEvent;
+    try {
+      event = (await request.json()) as UserEvent;
+    } catch {
+      return new Response("Invalid JSON", { status: 400 });
+    }
+    if (typeof event !== "object" || event === null || typeof event.kind !== "string") {
+      return new Response("Bad Request", { status: 400 });
+    }
+
+    const data = JSON.stringify(event);
+    const sockets = this.state.getWebSockets();
+    for (const ws of sockets) {
+      try {
+        ws.send(data);
+      } catch {
+        // 单个 socket 发送失败不影响其他
+      }
+    }
+
+    return new Response("OK", { status: 200 });
+  }
+
   private handleWebSocket(): Response {
     const pair = new WebSocketPair();
     const server = pair[0];
@@ -306,7 +339,7 @@ export class RoomDO implements DurableObject {
     }
 
     if (f.kind === "backfill" && typeof f.since === "string") {
-      const missed = this.recent.filter((m) => m.createdAt > f.since!);
+      const missed = this.recent.filter((m) => m.createdAt >= f.since!);
       const resp: BackfillFrame = { kind: "backfill", messages: missed };
       ws.send(JSON.stringify(resp));
       return;
@@ -438,6 +471,42 @@ export default {
       const id = env.ROOM.idFromName(roomName);
       const stub = env.ROOM.get(id);
       return stub.fetch(upstream);
+    }
+
+    if (url.pathname === "/publish-user-event" && request.method === "POST") {
+      const auth = request.headers.get("Authorization");
+      if (!auth || auth !== `Bearer ${env.LUMINA_API_TOKEN}`) {
+        return new Response("Unauthorized", { status: 401 });
+      }
+      let payload: { userIds?: unknown; event?: unknown };
+      try {
+        payload = (await request.json()) as { userIds?: unknown; event?: unknown };
+      } catch {
+        return new Response("Invalid JSON", { status: 400 });
+      }
+      if (
+        !Array.isArray(payload.userIds) ||
+        payload.userIds.length === 0 ||
+        typeof payload.event !== "object" ||
+        payload.event === null
+      ) {
+        return new Response("Bad Request", { status: 400 });
+      }
+      const eventJson = JSON.stringify(payload.event);
+      await Promise.all(
+        (payload.userIds as string[]).map((userId) => {
+          const id = env.ROOM.idFromName(`user-${userId}`);
+          const stub = env.ROOM.get(id);
+          return stub
+            .fetch(new Request("https://do/publish-user-event", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: eventJson,
+            }))
+            .catch(() => undefined);
+        }),
+      );
+      return new Response("OK", { status: 200 });
     }
 
     if (

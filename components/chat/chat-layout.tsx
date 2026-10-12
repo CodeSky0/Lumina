@@ -13,6 +13,7 @@ import {
 import {
   getMyConversations,
   getConversationMessages,
+  getMessagesSince,
   markConversationRead,
   markMessageRead,
   type ConversationItem,
@@ -20,7 +21,18 @@ import {
 } from "@/lib/messages/actions";
 import type { MessageType } from "@/lib/db/schema";
 import { useChatWs } from "@/lib/realtime/use-chat-ws";
+import { useUserWs } from "@/lib/realtime/use-user-ws";
 import { roomNameForClass, roomNameForDirect } from "@/lib/realtime/contract";
+
+function sortConversations(items: ConversationItem[]): ConversationItem[] {
+  return [...items].sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    if (a.type !== b.type) return a.type === "group" ? -1 : 1;
+    const aTime = a.lastMessageAt?.getTime() ?? 0;
+    const bTime = b.lastMessageAt?.getTime() ?? 0;
+    return bTime - aTime;
+  });
+}
 
 export function ChatLayout({
   userId,
@@ -42,6 +54,10 @@ export function ChatLayout({
   const [messages, setMessages] = useState<ClassMessage[]>([]);
   const [searching, setSearching] = useState(false);
   const reportedRef = useRef(new Set<string>());
+  const messagesRef = useRef<ClassMessage[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     void getMyConversations().then((cs) => {
@@ -82,31 +98,88 @@ export function ChatLayout({
         ),
       );
     },
+    (recall) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === recall.messageId
+            ? { ...m, deletedAt: new Date(recall.deletedAt), content: "", editHistory: null }
+            : m,
+        ),
+      );
+    },
+  );
+
+  useUserWs(
+    cfWorkerUrl,
+    userId,
+    (event) => {
+      if (event.conversationId === selectedId) return;
+      setConversations((prev) => {
+        const idx = prev.findIndex((c) => c.conversationId === event.conversationId);
+        if (idx === -1) return prev;
+        const updated = [...prev];
+        updated[idx] = {
+          ...updated[idx]!,
+          unreadCount: updated[idx]!.unreadCount + 1,
+          lastMessagePreview: event.preview,
+          lastMessageAt: new Date(event.createdAt),
+        };
+        return sortConversations(updated);
+      });
+    },
   );
 
   useEffect(() => {
     if (!selectedId) return;
     let active = true;
-    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function loadLatest() {
-      const msgs = await getConversationMessages(selectedId!);
       if (!active) return;
-      // 合并而非覆盖：保留尚未确认的乐观消息，避免 WS 实时消息被覆盖丢失
-      setMessages((prev) => {
-        const serverIds = new Set(msgs.map((m) => m.id));
-        const optimistic = prev.filter((m) => m.id.startsWith("optimistic-") && !serverIds.has(m.id));
-        return [...msgs, ...optimistic];
-      });
+      const currentMsgs = messagesRef.current;
+      if (currentMsgs.length === 0) {
+        const msgs = await getConversationMessages(selectedId!);
+        if (!active) return;
+        setMessages((prev) => {
+          const serverIds = new Set(msgs.map((m) => m.id));
+          const optimistic = prev.filter((m) => m.id.startsWith("optimistic-") && !serverIds.has(m.id));
+          return [...msgs, ...optimistic];
+        });
+      } else {
+        const since = currentMsgs[0]!.createdAt.toISOString();
+        const msgs = await getMessagesSince(selectedId!, since);
+        if (!active || msgs.length === 0) return;
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const newMsgs = msgs.filter((m) => !existingIds.has(m.id));
+          if (newMsgs.length === 0) return prev;
+          return [...newMsgs, ...prev];
+        });
+      }
     }
 
     void loadLatest();
 
     if (!connected) {
-      pollTimer = setInterval(() => {
-        if (document.hidden) return;
-        void loadLatest();
-      }, 5000);
+      let backoff = 5000;
+      const MAX_BACKOFF = 60000;
+      const poll = () => {
+        if (!active) return;
+        if (document.hidden) {
+          pollTimer = setTimeout(poll, backoff);
+          return;
+        }
+        void loadLatest().then(() => {
+          if (!active) return;
+          backoff = 5000;
+          pollTimer = setTimeout(poll, backoff);
+        }).catch(() => {
+          if (!active) return;
+          backoff = Math.min(backoff * 2, MAX_BACKOFF);
+          pollTimer = setTimeout(poll, backoff);
+        });
+      };
+      pollTimer = setTimeout(poll, backoff);
     }
 
     function onVisibilityChange() {
@@ -116,7 +189,7 @@ export function ChatLayout({
 
     return () => {
       active = false;
-      if (pollTimer) clearInterval(pollTimer);
+      if (pollTimer) clearTimeout(pollTimer);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [selectedId, connected]);
@@ -201,7 +274,6 @@ export function ChatLayout({
     setMessages((prev) =>
       prev.map((m) => {
         if (m.id !== tempId) return m;
-        // 释放乐观图片的 Object URL，防止内存泄漏
         if (m.type === "image" && m.content.startsWith("blob:")) {
           URL.revokeObjectURL(m.content);
         }
