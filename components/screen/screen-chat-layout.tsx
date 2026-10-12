@@ -15,6 +15,8 @@ import type { MessageType } from "@/lib/db/schema";
 import { useChatWs } from "@/lib/realtime/use-chat-ws";
 import { roomNameForClass } from "@/lib/realtime/contract";
 import type { ScreenTeacher } from "@/lib/messages/queries";
+import type { ScheduleEntry } from "@/lib/schedule/queries";
+import { ScheduleCard } from "./schedule-card";
 
 export function ScreenChatLayout({
   userId,
@@ -23,6 +25,8 @@ export function ScreenChatLayout({
   conversationId,
   cfWorkerUrl,
   teachers,
+  scheduleCurrent,
+  scheduleNext,
 }: {
   userId: string;
   className: string;
@@ -30,6 +34,8 @@ export function ScreenChatLayout({
   conversationId: string;
   cfWorkerUrl: string | null;
   teachers: ScreenTeacher[];
+  scheduleCurrent: ScheduleEntry | null;
+  scheduleNext: ScheduleEntry | null;
 }) {
   const [selectedKey, setSelectedKey] = useState<string>("all");
   const [messages, setMessages] = useState<ClassMessage[]>([]);
@@ -262,13 +268,16 @@ export function ScreenChatLayout({
               {className} · {presence.length} 人在线
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={`h-2 w-2 rounded-full ${connected ? "bg-success" : "bg-neutral-5"}`}
-            />
-            <span className="text-copy-14 text-neutral-6">
-              {connected ? "已连接" : "连接中"}
-            </span>
+          <div className="flex items-center gap-4">
+            <ScheduleCard current={scheduleCurrent} next={scheduleNext} />
+            <div className="flex items-center gap-2">
+              <span
+                className={`h-2 w-2 rounded-full ${connected ? "bg-success" : "bg-neutral-5"}`}
+              />
+              <span className="text-copy-14 text-neutral-6">
+                {connected ? "已连接" : "连接中"}
+              </span>
+            </div>
           </div>
         </div>
 

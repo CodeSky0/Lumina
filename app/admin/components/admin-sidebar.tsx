@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 
-export type AdminTab = "dashboard" | "users" | "subjects" | "classes" | "bindings" | "audit";
+export type AdminTab = "dashboard" | "users" | "subjects" | "classes" | "bindings" | "schedule" | "audit";
 
 const TAB_LABELS: Record<AdminTab, string> = {
   dashboard: "仪表盘",
@@ -10,6 +10,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   subjects: "学科管理",
   classes: "班级管理",
   bindings: "绑定关系",
+  schedule: "课表管理",
   audit: "审计日志",
 };
 

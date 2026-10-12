@@ -642,6 +642,84 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
 }));
 
 /* -------------------------------------------------------------------------- */
+/* schedule — 课表（大屏下节课功能）                                            */
+/* -------------------------------------------------------------------------- */
+
+export const schedule = pgTable(
+  "schedule",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    classId: uuid("class_id").notNull().references(() => classes.id, { onDelete: "cascade" }),
+    dayOfWeek: integer("day_of_week").notNull(),
+    period: integer("period").notNull(),
+    subjectId: uuid("subject_id").notNull().references(() => subjects.id, { onDelete: "cascade" }),
+    teacherId: text("teacher_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    startTime: text("start_time").notNull(),
+    endTime: text("end_time").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("schedule_class_day_period_unique").on(t.classId, t.dayOfWeek, t.period),
+    index("schedule_class_idx").on(t.classId),
+  ],
+);
+
+export const scheduleRelations = relations(schedule, ({ one }) => ({
+  class: one(classes, { fields: [schedule.classId], references: [classes.id] }),
+  subject: one(subjects, { fields: [schedule.subjectId], references: [subjects.id] }),
+  teacher: one(users, { fields: [schedule.teacherId], references: [users.id] }),
+}));
+
+/* -------------------------------------------------------------------------- */
+/* questions — 答疑墙提问                                                       */
+/* -------------------------------------------------------------------------- */
+
+export const questions = pgTable(
+  "questions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    askerId: text("asker_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    classId: uuid("class_id").references(() => classes.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    content: text("content").notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("questions_class_idx").on(t.classId),
+    index("questions_created_at_idx").on(t.createdAt),
+  ],
+);
+
+export const questionsRelations = relations(questions, ({ one, many }) => ({
+  asker: one(users, { fields: [questions.askerId], references: [users.id] }),
+  class: one(classes, { fields: [questions.classId], references: [classes.id] }),
+  answers: many(answers),
+}));
+
+/* -------------------------------------------------------------------------- */
+/* answers — 答疑墙回答                                                         */
+/* -------------------------------------------------------------------------- */
+
+export const answers = pgTable(
+  "answers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    questionId: uuid("question_id").notNull().references(() => questions.id, { onDelete: "cascade" }),
+    answererId: text("answerer_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("answers_question_idx").on(t.questionId)],
+);
+
+export const answersRelations = relations(answers, ({ one }) => ({
+  question: one(questions, { fields: [answers.questionId], references: [questions.id] }),
+  answerer: one(users, { fields: [answers.answererId], references: [users.id] }),
+}));
+
+/* -------------------------------------------------------------------------- */
 /* 派生类型导出                                                                */
 /* -------------------------------------------------------------------------- */
 

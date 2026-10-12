@@ -3,6 +3,7 @@
 import { ScreenChatLayout } from "@/components/screen/screen-chat-layout";
 import { CatOverlay } from "@/components/cat/cat-overlay";
 import type { ScreenTeacher } from "@/lib/messages/queries";
+import type { ScheduleEntry } from "@/lib/schedule/queries";
 
 export default function ScreenDisplay({
   userId,
@@ -11,6 +12,8 @@ export default function ScreenDisplay({
   conversationId,
   cfWorkerUrl,
   teachers,
+  scheduleCurrent,
+  scheduleNext,
 }: {
   userId: string;
   className: string;
@@ -18,6 +21,8 @@ export default function ScreenDisplay({
   conversationId: string;
   cfWorkerUrl: string | null;
   teachers: ScreenTeacher[];
+  scheduleCurrent: ScheduleEntry | null;
+  scheduleNext: ScheduleEntry | null;
 }) {
   if (!classId || !conversationId) {
     return (
@@ -36,6 +41,8 @@ export default function ScreenDisplay({
         conversationId={conversationId}
         cfWorkerUrl={cfWorkerUrl}
         teachers={teachers}
+        scheduleCurrent={scheduleCurrent}
+        scheduleNext={scheduleNext}
       />
       <CatOverlay />
     </>

@@ -99,6 +99,13 @@
       "when": 1788971000000,
       "tag": "0013_head_teacher",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1788972000000,
+      "tag": "0014_schedule_qawall",
+      "breakpoints": true
     }
   ]
 }

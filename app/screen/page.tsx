@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentSession } from "@/lib/auth/session";
 import { getScreenConversation, getScreenTeachers } from "@/lib/messages/queries";
+import { getCurrentAndNextClass } from "@/lib/schedule/queries";
 import ScreenDisplay from "./screen-display";
 
 export default async function ScreenPage() {
@@ -19,11 +20,14 @@ export default async function ScreenPage() {
         conversationId=""
         cfWorkerUrl={cfWorkerUrl}
         teachers={[]}
+        scheduleCurrent={null}
+        scheduleNext={null}
       />
     );
   }
 
   const teachers = await getScreenTeachers(screenConv.classId);
+  const schedule = await getCurrentAndNextClass(screenConv.classId);
 
   return (
     <ScreenDisplay
@@ -33,6 +37,8 @@ export default async function ScreenPage() {
       conversationId={screenConv.conversationId}
       cfWorkerUrl={cfWorkerUrl}
       teachers={teachers}
+      scheduleCurrent={schedule.current}
+      scheduleNext={schedule.next}
     />
   );
 }

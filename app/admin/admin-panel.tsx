@@ -23,6 +23,7 @@ import { SubjectsTab } from "./tabs/subjects-tab";
 import { ClassesTab } from "./tabs/classes-tab";
 import { BindingsTab } from "./tabs/bindings-tab";
 import { AuditTab } from "./tabs/audit-tab";
+import { ScheduleTab } from "./tabs/schedule-tab";
 
 interface AdminPanelProps {
   adminName: string;
@@ -106,6 +107,9 @@ export default function AdminPanel({ adminName }: AdminPanelProps) {
                   parentBindings={parentBindings}
                   onRefresh={refresh}
                 />
+              )}
+              {activeTab === "schedule" && (
+                <ScheduleTab classes={classes} subjects={subjects} users={users} onRefresh={refresh} />
               )}
               {activeTab === "audit" && <AuditTab />}
             </motion.div>
