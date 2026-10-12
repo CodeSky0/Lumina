@@ -20,6 +20,14 @@ import { z } from "zod";
 
 /* ------------------------------ 会话列表 ------------------------------ */
 
+function messageToPreview(msg: { content: string; type: MessageType }): string {
+  if (msg.type === "image") return "[图片]";
+  if (msg.type === "audio") return "[语音]";
+  if (msg.type === "file") return "[文件]";
+  if (msg.type === "urgent") return "[紧急] " + msg.content;
+  return msg.content;
+}
+
 export type ConversationItem = {
   conversationId: string;
   type: ConversationType;
@@ -77,17 +85,6 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         conversationId = created!.id;
       }
 
-      const lastMsg = await db
-        .select({
-          content: schema.messages.content,
-          type: schema.messages.type,
-          createdAt: schema.messages.createdAt,
-        })
-        .from(schema.messages)
-        .where(eq(schema.messages.conversationId, conversationId))
-        .orderBy(desc(schema.messages.createdAt))
-        .limit(1);
-
       items.push({
         conversationId,
         type: "group",
@@ -96,18 +93,8 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         classId: c.classId,
         participantAId: null,
         participantBId: null,
-        lastMessagePreview: lastMsg[0]
-          ? lastMsg[0].type === "image"
-            ? "[图片]"
-            : lastMsg[0].type === "audio"
-              ? "[语音]"
-              : lastMsg[0].type === "file"
-                ? "[文件]"
-                : lastMsg[0].type === "urgent"
-                  ? "[紧急] " + lastMsg[0].content
-                  : lastMsg[0].content
-          : null,
-        lastMessageAt: lastMsg[0]?.createdAt ?? null,
+        lastMessagePreview: null,
+        lastMessageAt: null,
         unreadCount: 0,
         pinned: false,
         muted: false,
@@ -167,17 +154,6 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         conversationId = created!.id;
       }
 
-      const lastMsg = await db
-        .select({
-          content: schema.messages.content,
-          type: schema.messages.type,
-          createdAt: schema.messages.createdAt,
-        })
-        .from(schema.messages)
-        .where(eq(schema.messages.conversationId, conversationId))
-        .orderBy(desc(schema.messages.createdAt))
-        .limit(1);
-
       items.push({
         conversationId,
         type: "direct",
@@ -186,18 +162,8 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         classId: null,
         participantAId: t.teacherId,
         participantBId: user.id,
-        lastMessagePreview: lastMsg[0]
-          ? lastMsg[0].type === "image"
-            ? "[图片]"
-            : lastMsg[0].type === "audio"
-              ? "[语音]"
-              : lastMsg[0].type === "file"
-                ? "[文件]"
-                : lastMsg[0].type === "urgent"
-                  ? "[紧急] " + lastMsg[0].content
-                  : lastMsg[0].content
-          : null,
-        lastMessageAt: lastMsg[0]?.createdAt ?? null,
+        lastMessagePreview: null,
+        lastMessageAt: null,
         unreadCount: 0,
         pinned: false,
         muted: false,
@@ -236,17 +202,6 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         conversationId = created!.id;
       }
 
-      const lastMsg = await db
-        .select({
-          content: schema.messages.content,
-          type: schema.messages.type,
-          createdAt: schema.messages.createdAt,
-        })
-        .from(schema.messages)
-        .where(eq(schema.messages.conversationId, conversationId))
-        .orderBy(desc(schema.messages.createdAt))
-        .limit(1);
-
       items.push({
         conversationId,
         type: "group",
@@ -255,18 +210,8 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         classId: c.classId,
         participantAId: null,
         participantBId: null,
-        lastMessagePreview: lastMsg[0]
-          ? lastMsg[0].type === "image"
-            ? "[图片]"
-            : lastMsg[0].type === "audio"
-              ? "[语音]"
-              : lastMsg[0].type === "file"
-                ? "[文件]"
-                : lastMsg[0].type === "urgent"
-                  ? "[紧急] " + lastMsg[0].content
-                  : lastMsg[0].content
-          : null,
-        lastMessageAt: lastMsg[0]?.createdAt ?? null,
+        lastMessagePreview: null,
+        lastMessageAt: null,
         unreadCount: 0,
         pinned: false,
         muted: false,
@@ -332,17 +277,6 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         conversationId = created!.id;
       }
 
-      const lastMsg = await db
-        .select({
-          content: schema.messages.content,
-          type: schema.messages.type,
-          createdAt: schema.messages.createdAt,
-        })
-        .from(schema.messages)
-        .where(eq(schema.messages.conversationId, conversationId))
-        .orderBy(desc(schema.messages.createdAt))
-        .limit(1);
-
       const studentNames = parentRows
         .filter((r) => r.parentId === p.parentId)
         .map((r) => r.studentName)
@@ -356,18 +290,8 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         classId: null,
         participantAId: user.id,
         participantBId: p.parentId,
-        lastMessagePreview: lastMsg[0]
-          ? lastMsg[0].type === "image"
-            ? "[图片]"
-            : lastMsg[0].type === "audio"
-              ? "[语音]"
-              : lastMsg[0].type === "file"
-                ? "[文件]"
-                : lastMsg[0].type === "urgent"
-                  ? "[紧急] " + lastMsg[0].content
-                  : lastMsg[0].content
-          : null,
-        lastMessageAt: lastMsg[0]?.createdAt ?? null,
+        lastMessagePreview: null,
+        lastMessageAt: null,
         unreadCount: 0,
         pinned: false,
         muted: false,
@@ -404,17 +328,6 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         conversationId = created!.id;
       }
 
-      const lastMsg = await db
-        .select({
-          content: schema.messages.content,
-          type: schema.messages.type,
-          createdAt: schema.messages.createdAt,
-        })
-        .from(schema.messages)
-        .where(eq(schema.messages.conversationId, conversationId))
-        .orderBy(desc(schema.messages.createdAt))
-        .limit(1);
-
       items.push({
         conversationId,
         type: "group",
@@ -423,18 +336,8 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
         classId,
         participantAId: null,
         participantBId: null,
-        lastMessagePreview: lastMsg[0]
-          ? lastMsg[0].type === "image"
-            ? "[图片]"
-            : lastMsg[0].type === "audio"
-              ? "[语音]"
-              : lastMsg[0].type === "file"
-                ? "[文件]"
-                : lastMsg[0].type === "urgent"
-                  ? "[紧急] " + lastMsg[0].content
-                  : lastMsg[0].content
-          : null,
-        lastMessageAt: lastMsg[0]?.createdAt ?? null,
+        lastMessagePreview: null,
+        lastMessageAt: null,
         unreadCount: 0,
         pinned: false,
         muted: false,
@@ -445,20 +348,40 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
   if (items.length > 0) {
     const conversationIds = items.map((i) => i.conversationId);
 
-    const reads = await db
+    const lastMsgSub = db
       .select({
-        conversationId: schema.messageReads.conversationId,
-        lastReadAt: schema.messageReads.lastReadAt,
+        conversationId: schema.messages.conversationId,
+        maxCreatedAt: sql<Date>`max(${schema.messages.createdAt})`.as("max_created"),
       })
-      .from(schema.messageReads)
-      .where(
+      .from(schema.messages)
+      .where(inArray(schema.messages.conversationId, conversationIds))
+      .groupBy(schema.messages.conversationId)
+      .as("last_msg_sub");
+
+    const lastMsgs = await db
+      .select({
+        conversationId: schema.messages.conversationId,
+        content: schema.messages.content,
+        type: schema.messages.type,
+        createdAt: schema.messages.createdAt,
+      })
+      .from(schema.messages)
+      .innerJoin(
+        lastMsgSub,
         and(
-          eq(schema.messageReads.userId, user.id),
-          inArray(schema.messageReads.conversationId, conversationIds),
+          eq(schema.messages.conversationId, lastMsgSub.conversationId),
+          eq(schema.messages.createdAt, lastMsgSub.maxCreatedAt),
         ),
       );
 
-    const readMap = new Map(reads.map((r) => [r.conversationId, r.lastReadAt]));
+    const lastMsgMap = new Map(lastMsgs.map((m) => [m.conversationId, m]));
+    for (const item of items) {
+      const last = lastMsgMap.get(item.conversationId);
+      if (last) {
+        item.lastMessagePreview = messageToPreview(last);
+        item.lastMessageAt = last.createdAt;
+      }
+    }
 
     const prefs = await db
       .select({
@@ -483,20 +406,34 @@ export async function getMyConversations(): Promise<ConversationItem[]> {
       }
     }
 
+    const unreadRows = await db
+      .select({
+        conversationId: schema.messages.conversationId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(schema.messages)
+      .leftJoin(
+        schema.messageReads,
+        and(
+          eq(schema.messageReads.conversationId, schema.messages.conversationId),
+          eq(schema.messageReads.userId, user.id),
+        ),
+      )
+      .where(
+        and(
+          inArray(schema.messages.conversationId, conversationIds),
+          ne(schema.messages.senderId, user.id),
+          or(
+            isNull(schema.messageReads.lastReadAt),
+            gt(schema.messages.createdAt, schema.messageReads.lastReadAt),
+          ),
+        ),
+      )
+      .groupBy(schema.messages.conversationId);
+
+    const unreadMap = new Map(unreadRows.map((r) => [r.conversationId, r.count]));
     for (const item of items) {
-      const lastReadAt = readMap.get(item.conversationId);
-      const conditions = [
-        eq(schema.messages.conversationId, item.conversationId),
-        ne(schema.messages.senderId, user.id),
-      ];
-      if (lastReadAt) {
-        conditions.push(gt(schema.messages.createdAt, lastReadAt));
-      }
-      const count = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(schema.messages)
-        .where(and(...conditions));
-      item.unreadCount = count[0]?.count ?? 0;
+      item.unreadCount = unreadMap.get(item.conversationId) ?? 0;
     }
   }
 

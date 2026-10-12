@@ -167,7 +167,7 @@ export function ScreenChatLayout({
       timers.push(
         setTimeout(() => {
           void markMessageRead(msg.id).catch(() => {});
-        }, 5000),
+        }, 2000),
       );
     }
     return () => {

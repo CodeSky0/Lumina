@@ -122,6 +122,20 @@ export function ContactSidebar({
           </svg>
           <span>关于</span>
         </Link>
+        {(userRole === "parent" || userRole === "teacher") && (
+          <Link
+            href="/qawall"
+            title="答疑墙"
+            className="flex items-center gap-1.5 border-t border-border px-4 py-2 text-copy-13 text-neutral-6 transition-colors hover:bg-neutral-2 hover:text-neutral-9"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              <path d="M9.5 8a.5.5 0 1 0-1 0 .5.5 0 0 0 1 0z" />
+              <path d="M14.5 8a.5.5 0 1 0-1 0 .5.5 0 0 0 1 0z" />
+            </svg>
+            <span>答疑墙</span>
+          </Link>
+        )}
         <button
           onClick={async () => {
             await authClient.signOut();
