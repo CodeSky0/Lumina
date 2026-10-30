@@ -1,0 +1,28 @@
+# Local tools and agent state
+.tools/
+.codeartsdoer/
+
+# Dependencies and builds
+node_modules/
+.next/
+dist/
+coverage/
+*.test
+*.out
+
+# Runtime data
+.env
+.env.*
+!.env.example
+uploads/
+data/
+*.log
+
+# Test artifacts
+playwright-report/
+test-results/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
