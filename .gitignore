@@ -1,6 +1,9 @@
 # Local tools and agent state
 .tools/
 .codeartsdoer/
+.bugfix/
+.npm-cache/
+*.tsbuildinfo
 
 # Dependencies and builds
 node_modules/
