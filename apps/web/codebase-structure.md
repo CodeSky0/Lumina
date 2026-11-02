@@ -4,7 +4,8 @@
 
 - **Node.js**：项目文件未声明具体版本
 - **语言**：TypeScript 5.9.3（来自 package.json `devDependencies`）
-- **运行时 / 框架**：Next.js 15.5.7、React 19.1.1
+- **运行时 / 框架**：Next.js 16.4.3、React 19.2.9
+- **样式**：Tailwind CSS 4.3.3（CSS-first 配置，主题定义在 `app/globals.css` 的 `@theme` 中）
 - **包管理器**：npm（来自 package-lock.json；具体版本未声明）
 - **Monorepo 工具**：项目目录内未发现编排配置
 - **测试**：Vitest 3.2.4、Testing Library

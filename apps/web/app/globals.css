@@ -1,6 +1,50 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-indigo-50: #eef2ff;
+  --color-indigo-100: #e0e7ff;
+  --color-indigo-200: #c7d2fe;
+  --color-indigo-300: #a5b4fc;
+  --color-indigo-400: #818cf8;
+  --color-indigo-500: #6366f1;
+  --color-indigo-600: #5457e5;
+  --color-indigo-700: #4548c7;
+  --color-indigo-800: #3730a3;
+  --color-indigo-900: #312e81;
+
+  --color-ink: #17181c;
+  --color-sidebar: #18191f;
+
+  --font-sans: "Geist", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "Geist Mono", "SFMono-Regular", "Consolas", monospace;
+
+  --shadow-panel: 0 16px 40px -28px rgba(24, 25, 31, 0.28);
+  --shadow-dialog: 0 24px 64px -24px rgba(24, 25, 31, 0.28);
+
+  --animate-enter: enter 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-pulseSoft: pulseSoft 2.4s ease-in-out infinite;
+
+  @keyframes enter {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes pulseSoft {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+}
 
 :root {
   --accent: #6366f1;

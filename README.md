@@ -5,7 +5,7 @@ Lumina 面向校内管理员、教师和教室大屏，提供教学通道、实�
 ## 仓库结构
 
 - `apps/api`：Go 1.23、Gin、GORM、SQL 迁移、幂等 seed。
-- `apps/web`：Next.js 15 / React 19 三端界面。
+- `apps/web`：Next.js 16 / React 19.2 / Tailwind CSS 4 三端界面。
 - `deploy/nginx.conf`：同源 `/`、`/api`、`/ws` 反向代理。
 - `compose.yaml`：PostgreSQL 16、Redis 7、迁移、seed、API、Web、Nginx。
 - `tests/e2e`：针对真实 API、UI 和 WebSocket 的 Playwright 测试，不 mock 业务。

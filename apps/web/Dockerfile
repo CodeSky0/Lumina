@@ -9,7 +9,7 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1 \
     API_INTERNAL_URL=http://api:8080
 COPY --from=dependencies /app/node_modules ./node_modules
-COPY package.json package-lock.json next.config.ts tsconfig.json next-env.d.ts postcss.config.mjs tailwind.config.ts vitest.config.ts vitest.setup.ts ./
+COPY package.json package-lock.json next.config.ts tsconfig.json next-env.d.ts postcss.config.mjs vitest.config.ts vitest.setup.ts ./
 COPY app ./app
 COPY components ./components
 COPY lib ./lib

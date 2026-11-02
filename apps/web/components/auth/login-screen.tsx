@@ -79,8 +79,8 @@ export function LoginScreen() {
                 <p className="mt-3 text-sm leading-6 text-zinc-500">使用校园账号登录，教室设备可切换绑定码登录。</p>
               </div>
               <div className="mb-7 grid grid-cols-2 rounded-xl bg-zinc-100 p-1" role="tablist" aria-label="登录方式">
-                <button role="tab" aria-selected={mode === "account"} onClick={() => switchMode("account")} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-lg text-sm font-medium transition", mode === "account" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-800")}><UserIcon className="h-4 w-4" />账号登录</button>
-                <button role="tab" aria-selected={mode === "device"} onClick={() => switchMode("device")} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-lg text-sm font-medium transition", mode === "device" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-800")}><DeviceMobile className="h-4 w-4" />设备登录</button>
+                <button role="tab" aria-selected={mode === "account"} onClick={() => switchMode("account")} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-lg text-sm font-medium transition", mode === "account" ? "bg-white text-zinc-900 shadow-xs" : "text-zinc-500 hover:text-zinc-800")}><UserIcon className="h-4 w-4" />账号登录</button>
+                <button role="tab" aria-selected={mode === "device"} onClick={() => switchMode("device")} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-lg text-sm font-medium transition", mode === "device" ? "bg-white text-zinc-900 shadow-xs" : "text-zinc-500 hover:text-zinc-800")}><DeviceMobile className="h-4 w-4" />设备登录</button>
               </div>
               <form className="space-y-5" onSubmit={submit}>
                 {mode === "account" ? (

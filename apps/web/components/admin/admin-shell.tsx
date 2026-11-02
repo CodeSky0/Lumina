@@ -28,7 +28,7 @@ function Navigation({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   return <nav className="space-y-1" aria-label="管理端导航">{navigation.map((item) => {
     const active = item.href === "/admin" ? pathname === item.href : pathname.startsWith(item.href);
-    return <Link key={item.href} href={item.href} onClick={onNavigate} aria-current={active ? "page" : undefined} className={cn("flex min-h-11 items-center gap-3 rounded-xl px-3.5 text-sm font-medium outline-none transition focus-visible:ring-2 focus-visible:ring-indigo-400", active ? "bg-indigo-500 text-white" : "text-zinc-400 hover:bg-white/[0.06] hover:text-white")}><item.icon className="h-5 w-5" weight={active ? "fill" : "regular"} />{item.label}</Link>;
+    return <Link key={item.href} href={item.href} onClick={onNavigate} aria-current={active ? "page" : undefined} className={cn("flex min-h-11 items-center gap-3 rounded-xl px-3.5 text-sm font-medium outline-hidden transition focus-visible:ring-2 focus-visible:ring-indigo-400", active ? "bg-indigo-500 text-white" : "text-zinc-400 hover:bg-white/[0.06] hover:text-white")}><item.icon className="h-5 w-5" weight={active ? "fill" : "regular"} />{item.label}</Link>;
   })}</nav>;
 }
 

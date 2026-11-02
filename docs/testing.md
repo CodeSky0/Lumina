@@ -6,6 +6,7 @@
 
 - Linux arm64，Go 1.23.4，Node.js 22。
 - 全链路 E2E 使用 Next.js 15.5.7；交付前已升级到 15.5.28 并重新通过单元测试、类型检查与生产构建。
+- 后续升级到 Next.js 16.4.3 / React 19.2.9 / Tailwind CSS 4.3.3，已重新通过单元测试（48 项）、类型检查与生产构建。
 - 真实 PostgreSQL 16.4、真实 Redis 7.2.5、Playwright Chromium 141。
 - 当前环境没有 Docker，因此未执行镜像构建、Compose 启动或容器内 Nginx 验证；这些目标机步骤保留在部署文档中。
 

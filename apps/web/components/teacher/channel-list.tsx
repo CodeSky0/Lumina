@@ -36,7 +36,7 @@ export function ChannelList({ selectedId, onSelect }: { selectedId?: string; onS
         ) : (
           <div className="space-y-1" role="list" aria-label="会话列表">
             {channels.map((channel) => (
-              <button key={channel.id} role="listitem" onClick={() => onSelect(channel)} className={cn("flex w-full items-start gap-3 rounded-2xl p-3 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-indigo-500", selectedId === channel.id ? "bg-indigo-50" : "hover:bg-zinc-50")} aria-current={selectedId === channel.id ? "true" : undefined}>
+              <button key={channel.id} role="listitem" onClick={() => onSelect(channel)} className={cn("flex w-full items-start gap-3 rounded-2xl p-3 text-left outline-hidden transition focus-visible:ring-2 focus-visible:ring-indigo-500", selectedId === channel.id ? "bg-indigo-50" : "hover:bg-zinc-50")} aria-current={selectedId === channel.id ? "true" : undefined}>
                 <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", selectedId === channel.id ? "bg-indigo-500 text-white" : "bg-zinc-100 text-zinc-500")} aria-hidden="true">{channel.type === "broadcast" ? <Megaphone className="h-5 w-5" /> : <Hash className="h-5 w-5" />}</span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center justify-between gap-2"><span className="truncate text-sm font-semibold text-zinc-900">{channel.name}</span>{channel.unread_count > 0 && <span className="flex min-w-5 items-center justify-center rounded-full bg-indigo-500 px-1.5 py-0.5 text-[11px] font-semibold text-white" aria-label={`${channel.unread_count} 条未读`}>{channel.unread_count > 99 ? "99+" : channel.unread_count}</span>}</span>
