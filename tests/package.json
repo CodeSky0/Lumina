@@ -1,0 +1,18 @@
+{
+  "name": "lumina-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lumina 真实 Compose 服务的 Playwright 端到端测试",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "typecheck": "tsc --noEmit",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "22.18.8",
+    "typescript": "5.9.3"
+  }
+}

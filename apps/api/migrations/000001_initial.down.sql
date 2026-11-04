@@ -1,0 +1,18 @@
+DROP TABLE IF EXISTS system_settings;
+DROP TRIGGER IF EXISTS audit_logs_append_only ON audit_logs;
+DROP FUNCTION IF EXISTS prevent_audit_mutation;
+DROP TABLE IF EXISTS audit_logs;
+DROP TABLE IF EXISTS files;
+DROP TABLE IF EXISTS device_bindings;
+DROP TABLE IF EXISTS refresh_tokens;
+DROP TABLE IF EXISTS announcement_confirmations;
+DROP TABLE IF EXISTS announcements;
+DROP TABLE IF EXISTS channel_reads;
+DROP TABLE IF EXISTS message_confirmations;
+DROP TABLE IF EXISTS message_reads;
+DROP TABLE IF EXISTS messages;
+DROP TABLE IF EXISTS channels;
+DROP TABLE IF EXISTS teaching_assignments;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS subjects;
+DROP TABLE IF EXISTS classes;
