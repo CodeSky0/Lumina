@@ -9,6 +9,7 @@ const labels = {
   connected: "实时连接正常",
   reconnecting: "正在恢复连接",
   offline: "网络已断开",
+  maintenance: "服务维护中",
 };
 
 export function ConnectionIndicator({ dark = false }: { dark?: boolean }) {

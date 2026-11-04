@@ -46,9 +46,10 @@ func (h *WebSocketHandler) Serve(c *gin.Context) {
 		return
 	}
 	client := h.hub.NewClient(uuid.NewString(), *user, channelIDs, connection)
-	h.hub.Register(client)
-	go client.WritePump()
-	client.ReadPump()
+	if !h.hub.Register(client) {
+		return
+	}
+	client.Run()
 }
 
 func methodNotAllowed(c *gin.Context) {

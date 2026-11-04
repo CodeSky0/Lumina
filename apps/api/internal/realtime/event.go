@@ -18,6 +18,9 @@ const (
 	EventTyping                  = "typing"
 	EventPresence                = "presence"
 	EventReadAck                 = "read_ack"
+	EventDeliveryAck             = "delivery_ack"
+	EventServerShutdown          = "server_shutdown"
+	EventUrgentConfirmed         = "urgent_confirmed"
 )
 
 type Event struct {

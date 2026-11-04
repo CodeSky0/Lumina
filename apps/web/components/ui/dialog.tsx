@@ -12,10 +12,11 @@ interface DialogProps {
   children: ReactNode;
   onClose?: () => void;
   blocking?: boolean;
+  fullscreen?: boolean;
   className?: string;
 }
 
-export function Dialog({ open, title, description, children, onClose, blocking = false, className }: DialogProps) {
+export function Dialog({ open, title, description, children, onClose, blocking = false, fullscreen = false, className }: DialogProps) {
   const titleId = useId();
   const descriptionId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -50,7 +51,7 @@ export function Dialog({ open, title, description, children, onClose, blocking =
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6" role="presentation">
+    <div className={cn("fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6", fullscreen && "p-0 sm:p-0")} role="presentation">
       <div className="absolute inset-0 bg-zinc-950/55 backdrop-blur-[2px]" onClick={blocking ? undefined : onClose} aria-hidden="true" />
       <div
         ref={panelRef}
@@ -58,7 +59,7 @@ export function Dialog({ open, title, description, children, onClose, blocking =
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
-        className={cn("relative max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-3xl border border-white/40 bg-white p-6 shadow-dialog animate-enter sm:p-7", className)}
+        className={cn("relative max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-3xl border border-white/40 bg-white p-6 shadow-dialog animate-enter sm:p-7", className, fullscreen && "flex h-[100dvh] max-h-none max-w-none flex-col justify-center rounded-none p-8 sm:p-12")}
       >
         <div className="mb-6 flex items-start justify-between gap-5">
           <div>

@@ -153,18 +153,19 @@ func (t MessageType) Valid() bool {
 }
 
 type Message struct {
-	ID        ID             `json:"id" gorm:"primaryKey"`
-	ChannelID ID             `json:"channel_id" gorm:"not null"`
-	SenderID  ID             `json:"sender_id" gorm:"not null"`
-	Type      MessageType    `json:"type" gorm:"size:20;not null"`
-	Content   string         `json:"content" gorm:"type:text;not null"`
-	Metadata  datatypes.JSON `json:"metadata" gorm:"type:jsonb;not null"`
-	ReplyToID *ID            `json:"reply_to_id,omitempty"`
-	IsPinned  bool           `json:"is_pinned" gorm:"not null;default:false"`
-	CreatedAt time.Time      `json:"created_at"`
-	EditedAt  *time.Time     `json:"edited_at,omitempty"`
-	DeletedAt *time.Time     `json:"deleted_at,omitempty"`
-	Sender    *User          `json:"-" gorm:"foreignKey:SenderID"`
+	ID          ID             `json:"id" gorm:"primaryKey"`
+	ChannelID   ID             `json:"channel_id" gorm:"not null"`
+	SenderID    ID             `json:"sender_id" gorm:"not null"`
+	ClientMsgID *string        `json:"client_msg_id,omitempty" gorm:"type:uuid"`
+	Type        MessageType    `json:"type" gorm:"size:20;not null"`
+	Content     string         `json:"content" gorm:"type:text;not null"`
+	Metadata    datatypes.JSON `json:"metadata" gorm:"type:jsonb;not null"`
+	ReplyToID   *ID            `json:"reply_to_id,omitempty"`
+	IsPinned    bool           `json:"is_pinned" gorm:"not null;default:false"`
+	CreatedAt   time.Time      `json:"created_at"`
+	EditedAt    *time.Time     `json:"edited_at,omitempty"`
+	DeletedAt   *time.Time     `json:"deleted_at,omitempty"`
+	Sender      *User          `json:"-" gorm:"foreignKey:SenderID"`
 }
 
 type MessageRead struct {
@@ -178,6 +179,29 @@ type MessageConfirmation struct {
 	UserID      ID        `json:"user_id" gorm:"primaryKey;autoIncrement:false"`
 	ConfirmedAt time.Time `json:"confirmed_at" gorm:"not null"`
 }
+
+type MessageDelivery struct {
+	MessageID   ID        `json:"message_id" gorm:"primaryKey;autoIncrement:false"`
+	UserID      ID        `json:"user_id" gorm:"primaryKey;autoIncrement:false"`
+	DeliveredAt time.Time `json:"delivered_at" gorm:"not null"`
+}
+
+type RealtimeOutbox struct {
+	ID          ID             `json:"id" gorm:"primaryKey"`
+	EventID     string         `json:"event_id" gorm:"type:uuid;not null;uniqueIndex"`
+	EventType   string         `json:"event_type" gorm:"size:64;not null"`
+	ChannelID   *ID            `json:"channel_id,omitempty"`
+	Payload     datatypes.JSON `json:"payload" gorm:"type:jsonb;not null"`
+	OccurredAt  time.Time      `json:"occurred_at" gorm:"not null"`
+	CreatedAt   time.Time      `json:"created_at"`
+	PublishedAt *time.Time     `json:"published_at,omitempty"`
+	Attempts    int            `json:"attempts" gorm:"not null;default:0"`
+	AvailableAt time.Time      `json:"available_at" gorm:"not null"`
+	LockedAt    *time.Time     `json:"locked_at,omitempty"`
+	LockedBy    *string        `json:"locked_by,omitempty" gorm:"size:100"`
+}
+
+func (RealtimeOutbox) TableName() string { return "realtime_outbox" }
 
 type ChannelRead struct {
 	ChannelID         ID        `json:"channel_id" gorm:"primaryKey;autoIncrement:false"`

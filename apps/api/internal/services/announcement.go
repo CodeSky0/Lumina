@@ -40,11 +40,16 @@ type AnnouncementInput struct {
 type AnnouncementService struct {
 	db        *gorm.DB
 	publisher realtime.Publisher
+	recorder  EventRecorder
 	now       func() time.Time
 }
 
-func NewAnnouncementService(db *gorm.DB, publisher realtime.Publisher) *AnnouncementService {
-	return &AnnouncementService{db: db, publisher: publisher, now: func() time.Time { return time.Now().UTC() }}
+func NewAnnouncementService(db *gorm.DB, publisher realtime.Publisher, recorders ...EventRecorder) *AnnouncementService {
+	var recorder EventRecorder
+	if len(recorders) > 0 {
+		recorder = recorders[0]
+	}
+	return &AnnouncementService{db: db, publisher: publisher, recorder: recorder, now: func() time.Time { return time.Now().UTC() }}
 }
 
 func (s *AnnouncementService) Create(ctx context.Context, publisherID models.ID, input AnnouncementInput, audit AuditEntry) (*AnnouncementDTO, error) {
@@ -60,20 +65,6 @@ func (s *AnnouncementService) Create(ctx context.Context, publisherID models.ID,
 		return nil, apperror.Forbidden("ANNOUNCEMENT_FORBIDDEN", "只有管理员可以发布公告")
 	}
 	announcement := models.Announcement{Title: strings.TrimSpace(input.Title), Content: strings.TrimSpace(input.Content), Type: input.Type, Scope: input.Scope, Grade: input.Grade, TargetClassID: input.TargetClassID, PublisherID: publisherID, CreatedAt: s.now(), UpdatedAt: s.now()}
-	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(&announcement).Error; err != nil {
-			return err
-		}
-		audit.ResourceType = "announcement"
-		audit.ResourceID = announcement.ID.String()
-		audit.Action = "announcement.create"
-		audit.Details = map[string]any{"title": announcement.Title, "type": announcement.Type, "scope": announcement.Scope}
-		return recordAudit(ctx, tx, audit)
-	})
-	if err != nil {
-		return nil, apperror.Internal(err)
-	}
-	dto := AnnouncementDTO{ID: announcement.ID, Title: announcement.Title, Content: announcement.Content, Type: announcement.Type, Scope: announcement.Scope, Grade: announcement.Grade, TargetClassID: announcement.TargetClassID, PublisherID: publisherID, PublisherName: publisher.DisplayName, CreatedAt: announcement.CreatedAt}
 	var channels []models.Channel
 	query := s.db.WithContext(ctx).Where("type = 'broadcast' AND active = true AND broadcast_scope = ?", announcement.Scope)
 	if announcement.Scope == "grade" {
@@ -85,11 +76,41 @@ func (s *AnnouncementService) Create(ctx context.Context, publisherID models.ID,
 	if err := query.Find(&channels).Error; err != nil {
 		return nil, apperror.Internal(err)
 	}
-	for _, channel := range channels {
-		s.publish(ctx, realtime.NewEvent(realtime.EventAnnouncement, &channel.ID, map[string]any{"announcement": dto}))
+	dto := AnnouncementDTO{}
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&announcement).Error; err != nil {
+			return err
+		}
+		audit.ResourceType = "announcement"
+		audit.ResourceID = announcement.ID.String()
+		audit.Action = "announcement.create"
+		audit.Details = map[string]any{"title": announcement.Title, "type": announcement.Type, "scope": announcement.Scope}
+		if err := recordAudit(ctx, tx, audit); err != nil {
+			return err
+		}
+		dto = AnnouncementDTO{ID: announcement.ID, Title: announcement.Title, Content: announcement.Content, Type: announcement.Type, Scope: announcement.Scope, Grade: announcement.Grade, TargetClassID: announcement.TargetClassID, PublisherID: publisherID, PublisherName: publisher.DisplayName, CreatedAt: announcement.CreatedAt}
+		if s.recorder != nil {
+			for _, channel := range channels {
+				if err := s.recorder.Record(tx, realtime.NewEvent(realtime.EventAnnouncement, &channel.ID, map[string]any{"announcement": dto})); err != nil {
+					return err
+				}
+			}
+			if len(channels) == 0 {
+				return s.recorder.Record(tx, announcementInvalidationEvent(announcement))
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, apperror.Internal(err)
 	}
-	if len(channels) == 0 {
-		s.publish(ctx, announcementInvalidationEvent(announcement))
+	if s.recorder == nil {
+		for _, channel := range channels {
+			s.publish(ctx, realtime.NewEvent(realtime.EventAnnouncement, &channel.ID, map[string]any{"announcement": dto}))
+		}
+		if len(channels) == 0 {
+			s.publish(ctx, announcementInvalidationEvent(announcement))
+		}
 	}
 	return &dto, nil
 }
@@ -136,13 +157,34 @@ func (s *AnnouncementService) Confirm(ctx context.Context, userID, announcementI
 	if announcement.Type != models.MessageUrgent {
 		return nil, apperror.BadRequest("CONFIRM_NOT_REQUIRED", "普通公告无需确认")
 	}
+	var user models.User
+	if err := s.db.WithContext(ctx).First(&user, userID).Error; err != nil {
+		return nil, apperror.Unauthorized("ACCOUNT_DISABLED", "账号不可用")
+	}
+	if err := requireClassroomConfirmation(user); err != nil {
+		return nil, err
+	}
 	now := s.now()
 	confirmation := models.AnnouncementConfirmation{AnnouncementID: announcementID, UserID: userID, ConfirmedAt: now}
-	if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&confirmation).Error; err != nil {
+	event := realtime.NewEvent(realtime.EventUrgentConfirmed, nil, map[string]any{"kind": "announcement", "announcement_id": announcementID, "user_id": userID})
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&confirmation).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("announcement_id = ? AND user_id = ?", announcementID, userID).First(&confirmation).Error; err != nil {
+			return err
+		}
+		event.Data["confirmed_at"] = confirmation.ConfirmedAt
+		if s.recorder != nil {
+			return s.recorder.Record(tx, event)
+		}
+		return nil
+	})
+	if err != nil {
 		return nil, apperror.Internal(err)
 	}
-	if err := s.db.WithContext(ctx).Where("announcement_id = ? AND user_id = ?", announcementID, userID).First(&confirmation).Error; err != nil {
-		return nil, apperror.Internal(err)
+	if s.recorder == nil {
+		s.publish(ctx, event)
 	}
 	return &confirmation.ConfirmedAt, nil
 }

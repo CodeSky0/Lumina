@@ -1,10 +1,11 @@
 "use client";
 
 import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Bell, File as FileIcon, Image as ImageIcon, PaperPlaneRight, Siren, X } from "@phosphor-icons/react";
 import { apiFetch } from "@/lib/api";
 import { MAX_TEXT_LENGTH, validateMessage, validateUpload } from "@/lib/messages";
+import { useMessageSender } from "@/lib/message-sender";
 import type { Channel, Message, MessageType, Upload } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { uploadMessageFields } from "@/lib/upload";
@@ -25,7 +26,7 @@ export function Composer({ channel, replyTo, onCancelReply, allowedTypes = ["tex
   allowedTypes?: MessageType[];
   large?: boolean;
 }) {
-  const queryClient = useQueryClient();
+  const { enqueue } = useMessageSender();
   const formRef = useRef<HTMLFormElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -37,14 +38,7 @@ export function Composer({ channel, replyTo, onCancelReply, allowedTypes = ["tex
     setContent("");
     setError(null);
     onCancelReply();
-    void queryClient.invalidateQueries({ queryKey: ["messages", channel.id] });
-    void queryClient.invalidateQueries({ queryKey: ["channels"] });
   };
-  const sendMutation = useMutation({
-    mutationFn: (payload: { type: MessageType; content: string; reply_to_id?: string; metadata?: Message["metadata"] }) => apiFetch<Message>(`/api/v1/channels/${encodeURIComponent(channel.id)}/messages`, { method: "POST", body: payload }),
-    onSuccess: sent,
-    onError: setError,
-  });
   const uploadMutation = useMutation({
     mutationFn: async ({ file, kind }: { file: File; kind: "image" | "file" }) => {
       const form = new FormData();
@@ -52,12 +46,9 @@ export function Composer({ channel, replyTo, onCancelReply, allowedTypes = ["tex
       form.append("channel_id", channel.id);
       const upload = await apiFetch<Upload>("/api/v1/uploads", { method: "POST", body: form });
       const { fileName, metadata } = uploadMessageFields(upload, file);
-      return sendMutation.mutateAsync({
-        type: kind,
-        content: fileName,
-        reply_to_id: replyTo?.id,
-        metadata,
-      });
+      enqueue(channel.id, { type: kind, content: fileName, reply_to_id: replyTo?.id, metadata });
+      sent();
+      return upload;
     },
     onError: setError,
   });
@@ -66,7 +57,8 @@ export function Composer({ channel, replyTo, onCancelReply, allowedTypes = ["tex
     event.preventDefault();
     const validation = validateMessage(type, content);
     if (validation) { setError(new Error(validation)); return; }
-    sendMutation.mutate({ type, content: content.trim(), reply_to_id: replyTo?.id });
+    enqueue(channel.id, { type, content: content.trim(), reply_to_id: replyTo?.id });
+    sent();
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -84,7 +76,7 @@ export function Composer({ channel, replyTo, onCancelReply, allowedTypes = ["tex
     uploadMutation.mutate({ file, kind });
   }
 
-  const isPending = sendMutation.isPending || uploadMutation.isPending;
+  const isPending = uploadMutation.isPending;
   const length = Array.from(content).length;
   const visibleTypes = messageTypes.filter((item) => allowedTypes.includes(item.value));
   return (

@@ -71,7 +71,7 @@ curl --fail http://127.0.0.1:8080/health/ready
 | GET | `/api/v1/auth/me` | 返回当前有效用户 |
 | POST | `/api/v1/auth/ws-ticket` | 返回一次性短期 `ticket` 和 `expires_at` |
 
-WebSocket 使用 `GET /ws?ticket=<一次性ticket>` 升级，不是长期 Access Token 查询参数。Nginx 已配置 Upgrade 和 75 秒超时；服务端有 30 秒心跳，前端断线后指数退避并重查数据库。
+WebSocket 使用 `GET /ws?ticket=<一次性ticket>` 升级，不是长期 Access Token 查询参数。Nginx 已配置 Upgrade 和 75 秒超时；服务端每 25 秒发送协议 Ping，60 秒未收到 Pong 后清理连接，前端断线后指数退避并先做数据库增量同步。服务关闭时发送 `server_shutdown`，客户端显示维护状态并继续重连。
 
 ## 4. 通道与消息
 
@@ -227,4 +227,37 @@ curl -H "Authorization: Bearer $ACCESS_TOKEN" \
 }
 ```
 
-类型：`new_message`、`message_edited`、`message_deleted`、`announcement`、`typing`、`presence`、`read_ack`。客户端按 `event_id` 去重并按消息 ID 排序。消息先提交 PostgreSQL 再发布 Redis；Redis Pub/Sub 只负责实时提醒，断线期间的补偿来自重连后的数据库查询。
+类型：`new_message`、`message_edited`、`message_deleted`、`announcement`、`announcement_invalidated`、`typing`、`presence`、`read_ack`、`delivery_ack`、`urgent_confirmed`、`server_shutdown`。客户端按 `event_id` 去重并按消息 ID 排序。消息与 Outbox 在同一 PostgreSQL 事务提交，后台 relay 再向 Redis 至少投递一次；Redis Pub/Sub 只负责实时提醒，发布失败会退避重试，断线期间的补偿来自重连后的数据库查询。
+
+## 9. P0 可靠性扩展
+
+### 客户端幂等键
+
+发送消息可携带 `client_msg_id`（UUID）。同一发送者重复提交相同键且载荷一致时返回首次消息；通道、正文、类型、附件、回复目标或 metadata 不一致时返回 `409 IDEMPOTENCY_CONFLICT`。数据库对非空 `(sender_id, client_msg_id)` 建部分唯一索引，并发首次写入也只保留一条。旧客户端可省略该字段，但不获得客户端级去重保证。
+
+批量通知推荐使用独立目标键；旧 `channel_ids` 仍兼容：
+
+```json
+{
+  "targets": [
+    {"channel_id":"1","client_msg_id":"550e8400-e29b-41d4-a716-446655440000"},
+    {"channel_id":"2","client_msg_id":"660e8400-e29b-41d4-a716-446655440000"}
+  ],
+  "content":"通知内容",
+  "type":"notice"
+}
+```
+
+### 增量同步与投递回执
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/v1/channels/:id/messages/sync?after_id=&limit=` | 重新校验通道权限，按 `id > after_id` 升序返回，最多 100 条；返回 `next_after_id` 和 `has_more` |
+| POST | `/api/v1/messages/delivery-ack` | `{"message_ids":["1","2"]}`，每批 1–100 个 ID，逐通道鉴权，`ON CONFLICT DO NOTHING` |
+| GET | `/api/v1/messages/:id/confirmations` | 消息发送者或管理员查看各班确认状态 |
+| GET | `/api/v1/teacher/urgent-pending` | 教师查看全局紧急消息和公告，不写确认记录 |
+| GET | `/api/v1/announcements/:id/confirmations` | 公告发布者或管理员查看各班确认状态 |
+
+消息 DTO 新增 `client_msg_id`、`delivery_count`，紧急待办可携带 `channel_name`。`sent/delivered/read` 由服务端持久化及非发送者回执推导；发送者自己的回执不计数。只有 `classroom` 角色可以调用紧急消息或公告确认接口，教师和管理员的查看行为不会生成教室确认。
+
+浏览器发送队列仅保存在内存中，同一通道严格 FIFO；断线或同步期间暂停，恢复后复用原 UUID 重试。实时事件和队列更新均使用 100ms 合批窗口。

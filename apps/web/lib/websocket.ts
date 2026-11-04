@@ -2,7 +2,7 @@ import type { RealtimeEvent, RealtimeEventType } from "@/lib/types";
 import type { RealtimeStatus } from "@/stores/realtime";
 
 const EVENT_TYPES = new Set<RealtimeEventType>([
-  "new_message", "message_edited", "message_deleted", "announcement", "announcement_invalidated", "typing", "presence", "read_ack",
+  "new_message", "message_edited", "message_deleted", "announcement", "announcement_invalidated", "typing", "presence", "read_ack", "delivery_ack", "server_shutdown", "urgent_confirmed",
 ]);
 
 export class EventDeduplicator {
@@ -51,11 +51,11 @@ interface RealtimeClientOptions {
 
 export class RealtimeClient {
   private socket: WebSocket | null = null;
-  private heartbeat?: ReturnType<typeof setInterval>;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private attempt = 0;
   private stopped = true;
   private hasConnected = false;
+  private maintenance = false;
   private readonly deduplicator = new EventDeduplicator();
 
   constructor(private readonly options: RealtimeClientOptions) {}
@@ -70,19 +70,18 @@ export class RealtimeClient {
     this.clearTimers();
     this.socket?.close();
     this.socket = null;
+    this.maintenance = false;
     this.options.onStatus("idle");
   }
 
   private clearTimers(): void {
-    if (this.heartbeat) clearInterval(this.heartbeat);
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-    this.heartbeat = undefined;
     this.reconnectTimer = undefined;
   }
 
   private async connect(): Promise<void> {
     if (this.stopped) return;
-    this.options.onStatus(this.hasConnected ? "reconnecting" : "connecting");
+    this.options.onStatus(this.maintenance ? "maintenance" : this.hasConnected ? "reconnecting" : "connecting");
     try {
       const ticket = await this.options.getTicket();
       if (this.stopped) return;
@@ -93,34 +92,36 @@ export class RealtimeClient {
       socket.onopen = () => {
         const reconnected = this.hasConnected;
         this.hasConnected = true;
+        this.maintenance = false;
         this.attempt = 0;
         this.options.onStatus("connected");
         this.options.onOpen(reconnected);
-        this.heartbeat = setInterval(() => {
-          if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "ping" }));
-        }, 30_000);
       };
       socket.onmessage = (message) => {
         try {
           const event = parseRealtimeEvent(JSON.parse(String(message.data)));
-          if (event && this.deduplicator.accept(event.event_id)) this.options.onEvent(event);
+          if (event && this.deduplicator.accept(event.event_id)) {
+            if (event.type === "server_shutdown") {
+              this.maintenance = true;
+              this.options.onStatus("maintenance");
+            }
+            this.options.onEvent(event);
+          }
         } catch {
           // 非契约事件不进入业务状态，连接继续保持。
         }
       };
       socket.onerror = () => socket.close();
       socket.onclose = () => {
-        if (this.heartbeat) clearInterval(this.heartbeat);
-        this.heartbeat = undefined;
         if (this.stopped) return;
-        this.options.onStatus("reconnecting");
+        this.options.onStatus(this.maintenance ? "maintenance" : "reconnecting");
         const delay = reconnectDelay(this.attempt);
         this.attempt += 1;
         this.reconnectTimer = setTimeout(() => void this.connect(), delay);
       };
     } catch {
       if (this.stopped) return;
-      this.options.onStatus("reconnecting");
+      this.options.onStatus(this.maintenance ? "maintenance" : "reconnecting");
       const delay = reconnectDelay(this.attempt);
       this.attempt += 1;
       this.reconnectTimer = setTimeout(() => void this.connect(), delay);

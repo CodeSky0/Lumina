@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Megaphone, SignOut } from "@phosphor-icons/react";
 import type { Channel } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
 import { useSessionStore } from "@/stores/session";
+import { useRealtimeStore } from "@/stores/realtime";
 import { cn } from "@/lib/utils";
 import { Brand } from "@/components/ui/brand";
 import { Button } from "@/components/ui/button";
@@ -17,11 +18,28 @@ import { BatchNoticeDialog } from "@/components/teacher/batch-notice-dialog";
 function TeacherWorkspace() {
   const { logout } = useAuth();
   const user = useSessionStore((state) => state.user);
+  const requestedChannelId = useRealtimeStore((state) => state.requestedChannelId);
+  const requestChannel = useRealtimeStore((state) => state.requestChannel);
+  const setActiveChannel = useRealtimeStore((state) => state.setActiveChannel);
   const channelsQuery = useChannels();
   const [selected, setSelected] = useState<Channel>();
   const [mobileChat, setMobileChat] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
   const activeChannel = selected ? channelsQuery.data?.find((channel) => channel.id === selected.id) ?? selected : undefined;
+
+  useEffect(() => {
+    setActiveChannel(activeChannel?.id);
+    return () => setActiveChannel(undefined);
+  }, [activeChannel?.id, setActiveChannel]);
+  useEffect(() => {
+    if (!requestedChannelId) return;
+    const channel = channelsQuery.data?.find((item) => item.id === requestedChannelId);
+    if (channel) {
+      setSelected(channel);
+      setMobileChat(true);
+    }
+    requestChannel(undefined);
+  }, [requestedChannelId, channelsQuery.data, requestChannel]);
 
   function selectChannel(channel: Channel) { setSelected(channel); setMobileChat(true); }
 

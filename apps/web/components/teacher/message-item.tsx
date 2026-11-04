@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowBendUpLeft, Check, Checks, PencilSimple, Trash } from "@phosphor-icons/react";
+import { ArrowBendUpLeft, ArrowClockwise, Check, Checks, PencilSimple, Trash, WarningCircle } from "@phosphor-icons/react";
 import { apiFetch } from "@/lib/api";
 import { canRecall, validateMessage } from "@/lib/messages";
 import { formatDateTime } from "@/lib/format";
@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { InlineError } from "@/components/ui/async-state";
 import { FileAttachment } from "@/components/teacher/file-attachment";
+import { ConfirmationStatus } from "@/components/urgent/confirmation-status";
 
 interface MessageItemProps {
   message: Message;
@@ -22,14 +23,16 @@ interface MessageItemProps {
   large?: boolean;
   onReply?: (message: Message) => void;
   onRead: (message: Message) => Promise<void>;
+  onRetry?: (clientMsgId: string) => void;
 }
 
-export function MessageItem({ message, currentUserId, replyTarget, large = false, onReply, onRead }: MessageItemProps) {
+export function MessageItem({ message, currentUserId, replyTarget, large = false, onReply, onRead, onRetry }: MessageItemProps) {
   const queryClient = useQueryClient();
   const articleRef = useRef<HTMLElement>(null);
   const readSent = useRef(false);
   const readPending = useRef(false);
   const own = message.sender_id === currentUserId;
+  const failed = message.delivery_state === "failed";
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const [editError, setEditError] = useState<unknown>(null);
@@ -101,6 +104,7 @@ export function MessageItem({ message, currentUserId, replyTarget, large = false
           own ? "rounded-tr-md border-indigo-500 bg-indigo-500 text-white" : "rounded-tl-md border-zinc-200 bg-white text-zinc-800",
           notice && "border-amber-300 bg-amber-50 text-amber-950",
           urgent && "border-red-300 bg-red-50 text-red-950",
+          failed && "border-red-300 bg-zinc-100 text-zinc-500",
           large && "px-5 py-4 text-lg leading-8",
         )}>
           {(notice || urgent) && <Badge tone={urgent ? "red" : "yellow"} className="mb-2">{urgent ? "紧急通知" : "普通通知"}</Badge>}
@@ -111,9 +115,16 @@ export function MessageItem({ message, currentUserId, replyTarget, large = false
             <><p className={cn("whitespace-pre-wrap break-words leading-6", large && "text-lg leading-8")}>{message.content}</p>{(message.type === "image" || message.type === "file") && <FileAttachment message={message} large={large} />}</>
           )}
         </div>
+        {own && urgent && !message.delivery_state && !message.deleted_at && <details className="mt-2 w-full"><summary className="cursor-pointer text-xs font-medium text-indigo-600">查看班级确认状态</summary><ConfirmationStatus kind="message" id={message.id} /></details>}
         <div className={cn("mt-1.5 flex min-h-7 items-center gap-1 text-zinc-400", own && "flex-row-reverse")}>
-          {own && !message.deleted_at && <span className={cn("mr-1 flex items-center gap-1 text-xs", large && "text-base")}><Checks className="h-3.5 w-3.5" />{message.read_count} 人已读</span>}
-          {!message.deleted_at && !isEditing && (
+          {own && !message.deleted_at && (message.delivery_state === "sending" ? (
+            <span className={cn("mr-1 flex items-center gap-1 text-xs", large && "text-base")}><Checks className="h-3.5 w-3.5" />发送中</span>
+          ) : failed ? (
+            <button type="button" className={cn("mr-1 flex min-h-7 items-center gap-1 text-xs font-medium text-red-600", large && "min-h-12 text-base")} onClick={() => message.client_msg_id && onRetry?.(message.client_msg_id)} aria-label={`发送失败，重试：${message.error ?? "网络错误"}`}><WarningCircle className="h-4 w-4" />发送失败<ArrowClockwise className="h-3.5 w-3.5" />重试</button>
+          ) : (
+            <span className={cn("mr-1 flex items-center gap-1 text-xs", large && "text-base")}>{message.read_count > 0 ? <Checks className="h-3.5 w-3.5 text-sky-500" /> : (message.delivery_count ?? 0) > 0 ? <Checks className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}{message.read_count > 0 ? `${message.read_count} 人已读` : (message.delivery_count ?? 0) > 0 ? "已送达" : "已发送"}</span>
+          ))}
+          {!message.deleted_at && !isEditing && !message.delivery_state && (
             <div className="flex opacity-100 transition focus-within:opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
               {onReply && <Button variant="ghost" size="sm" className={cn(large && "min-h-12 text-base")} onClick={() => onReply(message)}><ArrowBendUpLeft className="h-3.5 w-3.5" />回复</Button>}
               {own && message.type === "text" && <Button variant="ghost" size="sm" className={cn(large && "min-h-12 text-base")} onClick={() => { setEditContent(message.content); setIsEditing(true); }}><PencilSimple className="h-3.5 w-3.5" />编辑</Button>}

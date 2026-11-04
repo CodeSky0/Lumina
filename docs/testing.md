@@ -63,3 +63,33 @@ npm --prefix tests test
 ```
 
 请勿对正在服务师生的生产实例直接运行会创建数据并停止代理的 E2E 套件。
+
+## 2026-11-04 P0 实时可靠性改造
+
+本次提交仅覆盖 P0，不把 P1–P3 的虚拟滚动、CSV、Wake Lock、通知设置和部署扩展标记为已完成。
+
+### 实现范围
+
+- 消息 UUID 幂等、数据库唯一约束、冲突重放、每通道内存 FIFO、失败手动重试和网络恢复自动重试。
+- 消息与事务 Outbox 同库提交，后台 relay 至少投递一次并退避恢复；修复 GORM 默认表名与迁移表名不一致问题。
+- `id > after_id` 增量同步、批量 delivery ACK、逐条 sent/delivered/read/failed 状态及 100ms UI 合批。
+- 25 秒协议心跳、60 秒 Pong 超时、指数退避、`server_shutdown` 维护态和 WebSocket 有界优雅关闭。
+- 教室全屏紧急通知、循环提示音、30 秒加强提醒、班级确认状态；教师全局查看弹窗和确认明细权限隔离。
+
+### 实际工具结果
+
+| 检查 | 结果 |
+| --- | --- |
+| Go 单元/SQL mock 测试 | `go test ./...` 全部通过 |
+| Go 竞态检测 | `go test -race ./...` 全部通过 |
+| Go 构建 | `go build ./cmd/...` 成功 |
+| Web 测试 | 27 个测试文件、68 项测试全部通过 |
+| Web 生产构建 | `next build` 成功，类型检查通过 |
+| Go 全仓语句覆盖率 | 23.2%；`realtime` 包 58.2%，`services` 包 19.7% |
+| Web 全仓语句覆盖率 | 56.16%；发送队列 91.91%、发送 Provider 96.29%、WebSocket 93.26%、确认组件 100% |
+
+覆盖率由 `go tool cover` 和 Vitest V8 实际生成，未将核心模块覆盖率冒充全仓 80% 达标；全仓历史模块仍需要后续补测。SQL mock 验证了 GORM 事务、查询和权限调用，不等同于真实 PostgreSQL 集成验收。
+
+### 环境限制与目标机复验
+
+当前环境没有 Docker 和 pnpm，因此本次未执行 Compose、真实 PostgreSQL 迁移/seed、容器内 Nginx、真实浏览器 E2E 或 `pnpm build`。上面的历史 15/15 E2E 记录不属于本次改动。目标机必须先执行 `docker compose up -d --build postgres redis migrate seed api web nginx`，再运行完整 Playwright 套件，并额外验证断网 5 秒、100 条并发、10 用户、Redis 故障恢复和跨页面紧急确认。

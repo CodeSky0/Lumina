@@ -15,11 +15,15 @@ export function invalidateRealtimeQueries(queryClient: QueryInvalidator, event: 
     void queryClient.invalidateQueries({ queryKey: ["channels"] });
     if (message.type === "urgent") void queryClient.invalidateQueries({ queryKey: ["urgent-pending"] });
   }
-  if (["message_edited", "message_deleted", "read_ack"].includes(event.type)) {
+  if (["message_edited", "message_deleted", "read_ack", "delivery_ack", "urgent_confirmed"].includes(event.type)) {
     if (event.channel_id) void queryClient.invalidateQueries({ queryKey: ["messages", event.channel_id] });
     void queryClient.invalidateQueries({ queryKey: ["channels"] });
   }
   if (event.type === "message_deleted" || isConfirmedReadAck(event)) {
+    void queryClient.invalidateQueries({ queryKey: ["urgent-pending"] });
+  }
+  if (event.type === "urgent_confirmed") {
+    void queryClient.invalidateQueries({ queryKey: ["confirmations"] });
     void queryClient.invalidateQueries({ queryKey: ["urgent-pending"] });
   }
   if (event.type === "presence") {

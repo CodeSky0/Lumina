@@ -28,16 +28,19 @@ type IncomingEvent struct {
 }
 
 type Client struct {
-	id        string
-	user      models.User
-	channels  map[models.ID]bool
-	conn      Conn
-	hub       *Hub
-	send      chan Event
-	done      chan struct{}
-	closeOnce sync.Once
-	heartbeat time.Duration
-	pongWait  time.Duration
+	id           string
+	user         models.User
+	channels     map[models.ID]bool
+	conn         Conn
+	hub          *Hub
+	send         chan Event
+	done         chan struct{}
+	graceful     chan struct{}
+	writeDone    chan struct{}
+	closeOnce    sync.Once
+	gracefulOnce sync.Once
+	heartbeat    time.Duration
+	pongWait     time.Duration
 }
 
 func (c *Client) Close() {
@@ -49,8 +52,38 @@ func (c *Client) Close() {
 	})
 }
 
+func (c *Client) requestGracefulShutdown() {
+	c.gracefulOnce.Do(func() { close(c.graceful) })
+}
+
+func (c *Client) writeEvent(event Event) error {
+	if socket, ok := c.conn.(*websocket.Conn); ok {
+		_ = socket.SetWriteDeadline(time.Now().Add(c.pongWait))
+	}
+	return c.conn.WriteJSON(event)
+}
+
+func (c *Client) writeGracefulClose() {
+	if err := c.writeEvent(NewEvent(EventServerShutdown, nil, map[string]any{"reason": "maintenance"})); err != nil {
+		return
+	}
+	for {
+		select {
+		case event := <-c.send:
+			if err := c.writeEvent(event); err != nil {
+				return
+			}
+		default:
+			_ = c.conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseGoingAway, "server shutdown"), time.Now().Add(10*time.Second))
+			return
+		}
+	}
+}
+
 func (c *Client) WritePump() {
+	defer close(c.writeDone)
 	if c.conn == nil {
+		c.Close()
 		return
 	}
 	ticker := time.NewTicker(c.heartbeat)
@@ -58,13 +91,17 @@ func (c *Client) WritePump() {
 	defer c.Close()
 	for {
 		select {
+		case <-c.graceful:
+			c.writeGracefulClose()
+			return
+		default:
+		}
+		select {
+		case <-c.graceful:
+			c.writeGracefulClose()
+			return
 		case event := <-c.send:
-			if c.conn != nil {
-				if socket, ok := c.conn.(*websocket.Conn); ok {
-					_ = socket.SetWriteDeadline(time.Now().Add(c.pongWait))
-				}
-			}
-			if err := c.conn.WriteJSON(event); err != nil {
+			if err := c.writeEvent(event); err != nil {
 				return
 			}
 		case <-ticker.C:
@@ -80,6 +117,15 @@ func (c *Client) WritePump() {
 			return
 		}
 	}
+}
+
+func (c *Client) Run() {
+	if c.conn == nil {
+		return
+	}
+	go c.WritePump()
+	c.ReadPump()
+	<-c.writeDone
 }
 
 func (c *Client) ReadPump() {

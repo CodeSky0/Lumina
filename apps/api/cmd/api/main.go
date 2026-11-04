@@ -44,14 +44,23 @@ func main() {
 	tickets := auth.NewRedisTicketStore(redisClient)
 	authService := auth.NewService(authRepo, limiter, tickets, tokens)
 	publisher := realtime.NewRedisPublisher(redisClient)
+	outbox := realtime.NewOutboxStore(db)
+	relay := realtime.NewOutboxRelay(outbox, publisher, "")
+	relayCtx, stopRelay := context.WithCancel(context.Background())
+	defer stopRelay()
+	relayDone := make(chan struct{})
+	go func() {
+		defer close(relayDone)
+		relay.Run(relayCtx)
+	}()
 	membership := services.NewMembership(db)
 	presence := realtime.NewRedisPresence(redisClient)
 	hub := realtime.NewHub(membership, publisher, presence)
 	audit := services.NewAuditService(db)
 	admin := services.NewAdminService(db)
 	channels := services.NewChannelService(db, membership, hub)
-	messages := services.NewMessageService(db, membership, publisher)
-	announcements := services.NewAnnouncementService(db, publisher)
+	messages := services.NewMessageService(db, membership, publisher, outbox)
+	announcements := services.NewAnnouncementService(db, publisher, outbox)
 	uploads := services.NewUploadService(db, membership, cfg.UploadDir)
 	router, err := httpapi.NewRouter(httpapi.Dependencies{Config: cfg, DB: db, Redis: redisClient, Auth: authService, Tokens: tokens, AuthRepo: authRepo, Admin: admin, Audit: audit, Membership: membership, Channels: channels, Messages: messages, Announcements: announcements, Uploads: uploads, Hub: hub})
 	if err != nil {
@@ -71,6 +80,11 @@ func main() {
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		log.Printf("HTTP 优雅退出失败: %v", err)
 	}
+	if err := hub.Shutdown(shutdownCtx); err != nil {
+		log.Printf("WebSocket 优雅退出失败: %v", err)
+	}
+	stopRelay()
+	<-relayDone
 	if err := redisClient.Close(); err != nil {
 		log.Printf("Redis 关闭失败: %v", err)
 	}

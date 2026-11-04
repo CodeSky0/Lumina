@@ -52,6 +52,19 @@ func (h *AnnouncementHandler) Confirm(c *gin.Context) {
 	}
 	data(c, http.StatusOK, gin.H{"confirmed": true, "id": id, "confirmed_at": confirmedAt})
 }
+func (h *AnnouncementHandler) ConfirmationStatus(c *gin.Context) {
+	id, err := pathID(c, "id")
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	items, err := h.service.ConfirmationStatus(c.Request.Context(), currentUser(c).ID, id)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	data(c, http.StatusOK, gin.H{"items": items})
+}
 func (h *AnnouncementHandler) UrgentPending(c *gin.Context) {
 	userID := currentUser(c).ID
 	messages, err := h.messages.PendingUrgent(c.Request.Context(), userID)

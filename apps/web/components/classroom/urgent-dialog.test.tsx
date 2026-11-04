@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from "react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -17,7 +17,10 @@ const announcement: Announcement = {
   publisher_id: "admin", publisher_name: "管理员", created_at: "2026-10-31T12:00:00Z",
 };
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe("紧急公告阻断与 DTO", () => {
   it("初次接口错误显示不可关闭的重试对话框，成功后展示真实标题和发布人", async () => {
@@ -38,5 +41,22 @@ describe("紧急公告阻断与 DTO", () => {
 
   it("紧急弹窗使用公告 title 与 publisher_name", () => {
     expect(normalizePending([announcement])).toEqual([{ id: "a1", kind: "announcement", title: "校舍火警", content: "立即疏散", sender: "管理员" }]);
+  });
+
+  it("30 秒未确认后加强提醒，弹窗全屏且确认按钮至少 64px", async () => {
+    vi.useFakeTimers();
+    vi.mocked(apiFetch).mockResolvedValue({ messages: [], announcements: [announcement] });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><UrgentDialog /></QueryClientProvider>);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByText("校舍火警")).toBeTruthy();
+
+    act(() => { vi.advanceTimersByTime(30_000); });
+    expect(screen.getByRole("alert").textContent).toContain("超过 30 秒");
+    expect(screen.getByRole("dialog").className).toContain("h-[100dvh]");
+    expect(screen.getByRole("button", { name: "我已阅读并确认" }).className).toContain("min-h-16");
   });
 });

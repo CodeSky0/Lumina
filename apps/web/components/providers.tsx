@@ -5,8 +5,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ApiError } from "@/lib/api";
 import { AuthProvider } from "@/lib/auth";
 import { RealtimeProvider } from "@/lib/realtime";
+import { MessageSendProvider } from "@/lib/message-sender";
+import { useSessionStore } from "@/stores/session";
+import { ConnectionBanner } from "@/components/ui/connection-banner";
+import { RealtimeNotification } from "@/components/ui/realtime-notification";
+import { TeacherUrgentDialog } from "@/components/urgent/teacher-urgent-dialog";
 
 export function Providers({ children }: { children: ReactNode }) {
+  const userId = useSessionStore((state) => state.user?.id);
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
@@ -24,7 +30,14 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <RealtimeProvider>{children}</RealtimeProvider>
+        <RealtimeProvider>
+          <MessageSendProvider key={userId ?? "anonymous"}>
+            <ConnectionBanner />
+            <RealtimeNotification />
+            <TeacherUrgentDialog />
+            {children}
+          </MessageSendProvider>
+        </RealtimeProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

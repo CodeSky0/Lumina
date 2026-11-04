@@ -22,6 +22,7 @@ class MockAudioContext {
 afterEach(() => {
   cleanup();
   starts.mockClear();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -35,6 +36,20 @@ describe("紧急提示音", () => {
     rerender({ id: "urgent-2" });
     expect(starts).toHaveBeenCalledTimes(2);
     rerender({ id: "urgent-2" });
+    expect(starts).toHaveBeenCalledTimes(2);
+  });
+
+  it("提示音循环播放，紧急项关闭后停止", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("AudioContext", MockAudioContext);
+    const { result, rerender } = renderHook(({ id }: { id?: string }) => useUrgentAudio(id), { initialProps: { id: "urgent-1" as string | undefined } });
+    await act(async () => result.current.unlock());
+    expect(starts).toHaveBeenCalledTimes(1);
+    act(() => { vi.advanceTimersByTime(900); });
+    expect(starts).toHaveBeenCalledTimes(2);
+
+    rerender({ id: undefined });
+    act(() => { vi.advanceTimersByTime(1800); });
     expect(starts).toHaveBeenCalledTimes(2);
   });
 });

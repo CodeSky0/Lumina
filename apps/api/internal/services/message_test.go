@@ -90,3 +90,82 @@ func TestBatchRejectsInvalidType(t *testing.T) {
 		t.Fatalf("错误类型不正确: %v", err)
 	}
 }
+
+func TestClientMessageIDValidation(t *testing.T) {
+	id, err := normalizeClientMessageID("550E8400-E29B-41D4-A716-446655440000")
+	if err != nil || id == nil || *id != "550e8400-e29b-41d4-a716-446655440000" {
+		t.Fatalf("UUID 应被规范化: id=%v err=%v", id, err)
+	}
+	if id, err := normalizeClientMessageID(""); err != nil || id != nil {
+		t.Fatalf("旧客户端的空幂等键应保持兼容: id=%v err=%v", id, err)
+	}
+	if _, err := normalizeClientMessageID("not-a-uuid"); err == nil {
+		t.Fatal("非法幂等键必须被拒绝")
+	} else if appErr, ok := err.(*apperror.Error); !ok || appErr.Code != "CLIENT_MSG_ID_INVALID" {
+		t.Fatalf("非法幂等键错误不正确: %v", err)
+	}
+}
+
+func TestMessageIdempotencyPayloadComparison(t *testing.T) {
+	clientID := "550e8400-e29b-41d4-a716-446655440000"
+	replyID := models.ID(9)
+	message := models.Message{ChannelID: 2, SenderID: 3, ClientMsgID: &clientID, Type: models.MessageText, Content: "内容", Metadata: []byte(`{"a":1,"b":2}`), ReplyToID: &replyID}
+	input := SendMessageInput{ClientMsgID: clientID, Type: models.MessageText, Content: "内容", Metadata: json.RawMessage(`{"b":2,"a":1}`), ReplyToID: &replyID}
+	if !sameMessageRequest(message, 2, input) {
+		t.Fatal("语义相同的 JSON 元数据应被视为同一请求")
+	}
+	input.Content = "不同内容"
+	if sameMessageRequest(message, 2, input) {
+		t.Fatal("正文变化必须触发幂等冲突")
+	}
+	input.Content = message.Content
+	if sameMessageRequest(message, 4, input) {
+		t.Fatal("通道变化必须触发幂等冲突")
+	}
+	otherReply := models.ID(10)
+	input.ReplyToID = &otherReply
+	if sameMessageRequest(message, 2, input) {
+		t.Fatal("回复目标变化必须触发幂等冲突")
+	}
+}
+
+func TestBatchTargetsRejectsDuplicates(t *testing.T) {
+	service := &MessageService{}
+	targets := []BatchTarget{{ChannelID: 1, ClientMsgID: "550e8400-e29b-41d4-a716-446655440000"}, {ChannelID: 1, ClientMsgID: "660e8400-e29b-41d4-a716-446655440000"}}
+	if _, err := service.BatchTargets(context.Background(), 1, targets, "通知", models.MessageNotice); err == nil {
+		t.Fatal("批量目标通道不能重复")
+	} else if appErr, ok := err.(*apperror.Error); !ok || appErr.Code != "CHANNEL_DUPLICATE" {
+		t.Fatalf("重复通道错误不正确: %v", err)
+	}
+}
+
+func TestDeliveryAcknowledgementInputRules(t *testing.T) {
+	if _, err := normalizeDeliveryIDs(nil); err == nil {
+		t.Fatal("空 delivery ACK 必须被拒绝")
+	}
+	tooMany := make([]models.ID, 101)
+	if _, err := normalizeDeliveryIDs(tooMany); err == nil {
+		t.Fatal("单批 delivery ACK 不能超过 100 条")
+	}
+	ids, err := normalizeDeliveryIDs([]models.ID{3, 2, 3, 1, 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != 3 || ids[0] != 3 || ids[1] != 2 || ids[2] != 1 {
+		t.Fatalf("delivery ACK 应按首次出现顺序去重: %v", ids)
+	}
+}
+
+func TestMessageDTOCarriesClientIDAndDeliveryState(t *testing.T) {
+	clientID := "550e8400-e29b-41d4-a716-446655440000"
+	message := models.Message{ID: 1, ChannelID: 2, SenderID: 3, ClientMsgID: &clientID, Type: models.MessageText, Content: "消息"}
+	dto := toMessageDTO(message, "教师", 0, nil)
+	dto.DeliveryCount = 1
+	payload, err := json.Marshal(dto)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(payload), `"client_msg_id":"550e8400-e29b-41d4-a716-446655440000"`) || !strings.Contains(string(payload), `"delivery_count":1`) {
+		t.Fatalf("消息 DTO 缺少幂等键或投递状态: %s", payload)
+	}
+}

@@ -72,17 +72,24 @@ export interface MessageMetadata {
 export interface Message {
   id: string;
   channel_id: string;
+  channel_name?: string;
   sender_id: string;
   sender_name: string;
+  client_msg_id?: string;
   type: MessageType;
   content: string;
   metadata: MessageMetadata;
   reply_to_id?: string;
   is_pinned: boolean;
   created_at: string;
+  edited_at?: string;
   deleted_at?: string;
+  delivery_count?: number;
   read_count: number;
   confirmed_at?: string;
+  delivery_state?: "sending" | "failed";
+  retryable?: boolean;
+  error?: string;
 }
 
 export interface MessagePageData {
@@ -155,7 +162,10 @@ export type RealtimeEventType =
   | "announcement_invalidated"
   | "typing"
   | "presence"
-  | "read_ack";
+  | "read_ack"
+  | "delivery_ack"
+  | "server_shutdown"
+  | "urgent_confirmed";
 
 export interface RealtimeEvent<T = unknown> {
   event_id: string;

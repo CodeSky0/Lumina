@@ -141,12 +141,12 @@ func TestGlobalInvalidationDoesNotRequireChannelSnapshot(t *testing.T) {
 }
 
 func TestHeartbeatConfiguration(t *testing.T) {
-	if HeartbeatInterval != 30*time.Second || PongWait != 60*time.Second {
+	if HeartbeatInterval != 25*time.Second || PongWait != 60*time.Second {
 		t.Fatal("心跳或读取超时配置不符合契约")
 	}
 	hub := NewHub(nil, nil, nil)
 	client := testClient(hub, 1)
-	if client.heartbeat != 30*time.Second || cap(client.send) != DefaultOutboundQueue {
+	if client.heartbeat != 25*time.Second || cap(client.send) != DefaultOutboundQueue {
 		t.Fatal("客户端心跳或有界队列未初始化")
 	}
 }

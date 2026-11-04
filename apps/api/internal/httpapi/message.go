@@ -46,6 +46,27 @@ func (h *MessageHandler) History(c *gin.Context) {
 	}
 	data(c, http.StatusOK, result)
 }
+func (h *MessageHandler) Sync(c *gin.Context) {
+	channelID, err := pathID(c, "id")
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	var afterID models.ID
+	if raw := c.Query("after_id"); raw != "" {
+		afterID, err = parseID(raw)
+		if err != nil {
+			respondError(c, err)
+			return
+		}
+	}
+	result, err := h.messages.Sync(c.Request.Context(), currentUser(c).ID, channelID, afterID, queryInt(c, "limit", 50))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	data(c, http.StatusOK, result)
+}
 func (h *MessageHandler) Send(c *gin.Context) {
 	channelID, err := pathID(c, "id")
 	if err != nil {
@@ -62,6 +83,19 @@ func (h *MessageHandler) Send(c *gin.Context) {
 		return
 	}
 	statusCreated(c, message)
+}
+func (h *MessageHandler) DeliveryAck(c *gin.Context) {
+	var input struct {
+		MessageIDs []models.ID `json:"message_ids"`
+	}
+	if !bind(c, &input) {
+		return
+	}
+	if err := h.messages.AcknowledgeDeliveries(c.Request.Context(), currentUser(c).ID, input.MessageIDs); err != nil {
+		respondError(c, err)
+		return
+	}
+	data(c, http.StatusOK, gin.H{"delivered": true})
 }
 func (h *MessageHandler) Edit(c *gin.Context) {
 	id, err := pathID(c, "id")
@@ -94,6 +128,19 @@ func (h *MessageHandler) Delete(c *gin.Context) {
 	}
 	data(c, http.StatusOK, gin.H{"deleted": true, "id": id})
 }
+func (h *MessageHandler) ConfirmationStatus(c *gin.Context) {
+	id, err := pathID(c, "id")
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	items, err := h.messages.ConfirmationStatus(c.Request.Context(), currentUser(c).ID, id)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	data(c, http.StatusOK, gin.H{"items": items})
+}
 func (h *MessageHandler) Read(c *gin.Context) {
 	id, err := pathID(c, "id")
 	if err != nil {
@@ -121,9 +168,10 @@ func (h *MessageHandler) Confirm(c *gin.Context) {
 }
 
 type batchRequest struct {
-	ChannelIDs []models.ID        `json:"channel_ids"`
-	Content    string             `json:"content"`
-	Type       models.MessageType `json:"type"`
+	ChannelIDs []models.ID            `json:"channel_ids"`
+	Targets    []services.BatchTarget `json:"targets"`
+	Content    string                 `json:"content"`
+	Type       models.MessageType     `json:"type"`
 }
 
 func (h *MessageHandler) Batch(c *gin.Context) {
@@ -131,7 +179,14 @@ func (h *MessageHandler) Batch(c *gin.Context) {
 	if !bind(c, &input) {
 		return
 	}
-	results, err := h.messages.Batch(c.Request.Context(), currentUser(c).ID, input.ChannelIDs, input.Content, input.Type)
+	targets := input.Targets
+	if len(targets) == 0 {
+		targets = make([]services.BatchTarget, 0, len(input.ChannelIDs))
+		for _, channelID := range input.ChannelIDs {
+			targets = append(targets, services.BatchTarget{ChannelID: channelID})
+		}
+	}
+	results, err := h.messages.BatchTargets(c.Request.Context(), currentUser(c).ID, targets, input.Content, input.Type)
 	if err != nil {
 		respondError(c, err)
 		return

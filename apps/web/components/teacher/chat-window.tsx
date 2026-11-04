@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowUp, ChatsCircle, MagnifyingGlass, X } from "@phosphor-i
 import { apiFetch } from "@/lib/api";
 import { useChannelMessages } from "@/lib/message-query";
 import { mergeMessages } from "@/lib/messages";
+import { combineQueuedMessages, useMessageSender, useQueuedMessages } from "@/lib/message-sender";
 import type { Channel, Message } from "@/lib/types";
 import { useSessionStore } from "@/stores/session";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,9 @@ export function ChatWindow({ channel, onBack }: { channel?: Channel; onBack?: ()
   const [replyTo, setReplyTo] = useState<Message>();
   const endRef = useRef<HTMLDivElement>(null);
   const messagesQuery = useChannelMessages(channel?.id, query);
-  const messages = useMemo(() => mergeMessages(messagesQuery.data?.pages ?? []), [messagesQuery.data]);
+  const queuedMessages = useQueuedMessages(channel?.id ?? "");
+  const { retry } = useMessageSender();
+  const messages = useMemo(() => combineQueuedMessages(mergeMessages(messagesQuery.data?.pages ?? []), queuedMessages), [messagesQuery.data, queuedMessages]);
   const messageMap = useMemo(() => new Map(messages.map((message) => [message.id, message])), [messages]);
 
   useEffect(() => { setSearchInput(""); setQuery(""); setReplyTo(undefined); }, [channel?.id]);
@@ -65,7 +68,7 @@ export function ChatWindow({ channel, onBack }: { channel?: Channel; onBack?: ()
             {messagesQuery.hasNextPage && <div className="mb-3 flex justify-center"><Button variant="ghost" size="sm" onClick={() => void messagesQuery.fetchNextPage()} isLoading={messagesQuery.isFetchingNextPage}><ArrowUp className="h-4 w-4" />加载更早消息</Button></div>}
             {messages.length === 0 ? <EmptyState title={query ? "没有找到相关消息" : "会话还没有消息"} description={query ? "搜索仅覆盖你有权访问的当前通道，请尝试其他关键词。" : "发送第一条消息，开始这个通道的沟通。"} /> : (
               <div role="log" aria-live="polite" aria-relevant="additions" className="mx-auto max-w-4xl">
-                {messages.map((message) => <MessageItem key={message.id} message={message} currentUserId={user.id} replyTarget={message.reply_to_id ? messageMap.get(message.reply_to_id) : undefined} onReply={setReplyTo} onRead={onRead} />)}
+                {messages.map((message) => <MessageItem key={message.id} message={message} currentUserId={user.id} replyTarget={message.reply_to_id ? messageMap.get(message.reply_to_id) : undefined} onReply={setReplyTo} onRead={onRead} onRetry={retry} />)}
               </div>
             )}
             <div ref={endRef} aria-hidden="true" />
