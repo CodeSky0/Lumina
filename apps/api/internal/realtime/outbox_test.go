@@ -13,11 +13,13 @@ import (
 )
 
 type fakeOutboxRepository struct {
-	records       []models.RealtimeOutbox
-	publishedIDs  []models.ID
-	failedIDs     []models.ID
-	failedAttempt int
-	availableAt   time.Time
+	records         []models.RealtimeOutbox
+	publishedIDs    []models.ID
+	publishedTokens []string
+	failedIDs       []models.ID
+	failedTokens    []string
+	failedAttempt   int
+	availableAt     time.Time
 }
 
 func (r *fakeOutboxRepository) Claim(_ context.Context, _ string, limit int, _ time.Time) ([]models.RealtimeOutbox, error) {
@@ -27,13 +29,15 @@ func (r *fakeOutboxRepository) Claim(_ context.Context, _ string, limit int, _ t
 	return r.records, nil
 }
 
-func (r *fakeOutboxRepository) MarkPublished(_ context.Context, id models.ID, _ time.Time) error {
+func (r *fakeOutboxRepository) MarkPublished(_ context.Context, id models.ID, claimToken string, _ time.Time) error {
 	r.publishedIDs = append(r.publishedIDs, id)
+	r.publishedTokens = append(r.publishedTokens, claimToken)
 	return nil
 }
 
-func (r *fakeOutboxRepository) MarkFailed(_ context.Context, id models.ID, attempts int, availableAt time.Time) error {
+func (r *fakeOutboxRepository) MarkFailed(_ context.Context, id models.ID, claimToken string, attempts int, availableAt time.Time) error {
 	r.failedIDs = append(r.failedIDs, id)
+	r.failedTokens = append(r.failedTokens, claimToken)
 	r.failedAttempt = attempts
 	r.availableAt = availableAt
 	return nil
@@ -61,16 +65,18 @@ func TestOutboxBackoff(t *testing.T) {
 func TestOutboxEventRoundTrip(t *testing.T) {
 	channelID := models.ID(7)
 	original := NewEvent(EventNewMessage, &channelID, map[string]any{"message_id": models.ID(9)})
+	recipientID := models.ID(8)
+	original.RecipientUserID = &recipientID
 	payload, err := json.Marshal(original.Data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	record := models.RealtimeOutbox{EventID: original.EventID, EventType: original.Type, ChannelID: original.ChannelID, Payload: datatypes.JSON(payload), OccurredAt: original.OccurredAt}
+	record := models.RealtimeOutbox{EventID: original.EventID, EventType: original.Type, ChannelID: original.ChannelID, RecipientUserID: original.RecipientUserID, Payload: datatypes.JSON(payload), OccurredAt: original.OccurredAt}
 	actual, err := eventFromOutbox(record)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if actual.EventID != original.EventID || actual.Type != original.Type || actual.ChannelID == nil || *actual.ChannelID != channelID || !actual.OccurredAt.Equal(original.OccurredAt) {
+	if actual.EventID != original.EventID || actual.Type != original.Type || actual.ChannelID == nil || *actual.ChannelID != channelID || actual.RecipientUserID == nil || *actual.RecipientUserID != recipientID || !actual.OccurredAt.Equal(original.OccurredAt) {
 		t.Fatalf("Outbox 事件信封不一致: %+v", actual)
 	}
 	if actual.Data["message_id"] != "9" {
@@ -82,7 +88,8 @@ func TestOutboxRelayPublishesClaimedEvent(t *testing.T) {
 	now := time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC)
 	event := NewEvent(EventNewMessage, nil, map[string]any{"message_id": models.ID(9)})
 	payload, _ := json.Marshal(event.Data)
-	repo := &fakeOutboxRepository{records: []models.RealtimeOutbox{{ID: 1, EventID: event.EventID, EventType: event.Type, Payload: datatypes.JSON(payload), OccurredAt: event.OccurredAt}}}
+	claimToken := "claim-a"
+	repo := &fakeOutboxRepository{records: []models.RealtimeOutbox{{ID: 1, EventID: event.EventID, EventType: event.Type, Payload: datatypes.JSON(payload), OccurredAt: event.OccurredAt, LockedBy: &claimToken}}}
 	publisher := &recordingPublisher{}
 	relay := newOutboxRelay(repo, publisher, "instance-a")
 	relay.now = func() time.Time { return now }
@@ -92,8 +99,8 @@ func TestOutboxRelayPublishesClaimedEvent(t *testing.T) {
 	if len(publisher.events) != 1 || publisher.events[0].EventID != event.EventID {
 		t.Fatalf("Relay 未按原事件 ID 发布: %+v", publisher.events)
 	}
-	if len(repo.publishedIDs) != 1 || repo.publishedIDs[0] != 1 || len(repo.failedIDs) != 0 {
-		t.Fatalf("成功后未正确标记 Outbox: %+v", repo)
+	if len(repo.publishedIDs) != 1 || repo.publishedIDs[0] != 1 || len(repo.publishedTokens) != 1 || repo.publishedTokens[0] != claimToken || len(repo.failedIDs) != 0 {
+		t.Fatalf("成功后未按认领令牌标记 Outbox: %+v", repo)
 	}
 }
 

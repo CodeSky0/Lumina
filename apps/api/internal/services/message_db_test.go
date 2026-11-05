@@ -76,6 +76,10 @@ func expectSenderQuery(mock sqlmock.Sqlmock, userID models.ID) {
 	mock.ExpectQuery(`SELECT \* FROM "users"`).WithArgs(userID, 1).WillReturnRows(sqlmock.NewRows([]string{"id", "username", "display_name", "role", "active"}).AddRow(userID, "teacher", "教师", "teacher", true))
 }
 
+func expectMessageIdempotencyLock(mock sqlmock.Sqlmock, userID models.ID) {
+	mock.ExpectExec(`SELECT pg_advisory_xact_lock\(hashtext\(\$1\), hashtext\(\$2\)\)`).WithArgs(userID.String(), testClientMessageID).WillReturnResult(driver.RowsAffected(0))
+}
+
 func messageColumns() []string {
 	return []string{"id", "channel_id", "sender_id", "client_msg_id", "type", "content", "metadata", "reply_to_id", "is_pinned", "created_at", "edited_at", "deleted_at"}
 }
@@ -94,6 +98,7 @@ func TestMessageSendIdempotentReplayWithSQL(t *testing.T) {
 	service, mock := newSQLMessageService(t, membership, publisher)
 	expectSenderQuery(mock, 1)
 	mock.ExpectBegin()
+	expectMessageIdempotencyLock(mock, 1)
 	mock.ExpectQuery(`SELECT \* FROM "messages" WHERE sender_id = \$1 AND client_msg_id = \$2`).WithArgs(models.ID(1), testClientMessageID, 1).WillReturnRows(messageRow(42))
 	mock.ExpectCommit()
 
@@ -112,6 +117,27 @@ func TestMessageSendIdempotentReplayWithSQL(t *testing.T) {
 	}
 }
 
+func TestMessageSendAttachmentRetryReturnsExistingAfterIdempotencyLock(t *testing.T) {
+	service, mock := newSQLMessageService(t, &fakeMessageMembership{}, nil)
+	input := SendMessageInput{ClientMsgID: testClientMessageID, Type: models.MessageFile, Metadata: json.RawMessage(`{"file_id":9}`)}
+	expectSenderQuery(mock, 1)
+	mock.ExpectBegin()
+	expectMessageIdempotencyLock(mock, 1)
+	mock.ExpectQuery(`SELECT \* FROM "messages" WHERE sender_id = \$1 AND client_msg_id = \$2`).WithArgs(models.ID(1), testClientMessageID, 1).WillReturnRows(sqlmock.NewRows(messageColumns()).AddRow(42, 2, 1, testClientMessageID, "file", "", []byte(`{"file_id":9}`), nil, false, testDatabaseTime, nil, nil))
+	mock.ExpectCommit()
+
+	dto, err := service.Send(context.Background(), 1, 2, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dto.ID != 42 {
+		t.Fatalf("附件并发重试未返回首次消息: %+v", dto)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestMessageSendCreatesAndRecordsEventInTransaction(t *testing.T) {
 	membership := &fakeMessageMembership{}
 	publisher := &fakeMessagePublisher{}
@@ -119,6 +145,7 @@ func TestMessageSendCreatesAndRecordsEventInTransaction(t *testing.T) {
 	service, mock := newSQLMessageService(t, membership, publisher, recorder)
 	expectSenderQuery(mock, 1)
 	mock.ExpectBegin()
+	expectMessageIdempotencyLock(mock, 1)
 	mock.ExpectQuery(`SELECT \* FROM "messages" WHERE sender_id = \$1 AND client_msg_id = \$2`).WithArgs(models.ID(1), testClientMessageID, 1).WillReturnError(gorm.ErrRecordNotFound)
 	mock.ExpectQuery(`INSERT INTO "messages"`).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(42))
 	mock.ExpectExec(`INSERT INTO "channel_reads"`).WillReturnResult(driver.RowsAffected(1))
@@ -143,6 +170,7 @@ func TestMessageSendUniqueConflictReturnsCommittedMessage(t *testing.T) {
 	service, mock := newSQLMessageService(t, &fakeMessageMembership{}, nil)
 	expectSenderQuery(mock, 1)
 	mock.ExpectBegin()
+	expectMessageIdempotencyLock(mock, 1)
 	mock.ExpectQuery(`SELECT \* FROM "messages" WHERE sender_id = \$1 AND client_msg_id = \$2`).WithArgs(models.ID(1), testClientMessageID, 1).WillReturnError(gorm.ErrRecordNotFound)
 	mock.ExpectQuery(`INSERT INTO "messages"`).WillReturnError(&pgconn.PgError{Code: "23505", Message: "duplicate key"})
 	mock.ExpectRollback()
@@ -191,25 +219,48 @@ func TestMessageSyncUsesCursorAndHydratesCounts(t *testing.T) {
 	}
 }
 
-func TestDeliveryAcknowledgementBatchIsIdempotentAndAuthorized(t *testing.T) {
+func TestDeliveryAcknowledgementBatchLocksInIDOrderAndIsAuthorized(t *testing.T) {
 	membership := &fakeMessageMembership{}
 	recorder := &fakeEventRecorder{}
 	service, mock := newSQLMessageService(t, membership, nil, recorder)
-	mock.ExpectQuery(`SELECT \* FROM "messages" WHERE id IN`).WithArgs(models.ID(41), models.ID(42)).WillReturnRows(messageRow(41).AddRow(42, 2, 1, testClientMessageID, "text", "下一条", []byte(`{}`), nil, false, testDatabaseTime, nil, nil))
+	mock.ExpectQuery(`SELECT \* FROM "messages" WHERE id IN`).WithArgs(models.ID(42), models.ID(41)).WillReturnRows(messageRow(41).AddRow(42, 2, 1, testClientMessageID, "text", "下一条", []byte(`{}`), nil, false, testDatabaseTime, nil, nil))
 	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT \* FROM "messages" WHERE id IN .* ORDER BY id ASC FOR UPDATE`).WithArgs(models.ID(41), models.ID(42)).WillReturnRows(messageRow(41).AddRow(42, 2, 1, testClientMessageID, "text", "下一条", []byte(`{}`), nil, false, testDatabaseTime, nil, nil))
 	mock.ExpectExec(`INSERT INTO "message_deliveries"`).WillReturnResult(driver.RowsAffected(2))
-	mock.ExpectQuery(`SELECT count\(\*\) FROM "message_deliveries" WHERE message_id = \$1 AND user_id <> \$2`).WithArgs(models.ID(41), models.ID(1)).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	mock.ExpectQuery(`SELECT count\(\*\) FROM "message_deliveries" WHERE message_id = \$1 AND user_id <> \$2`).WithArgs(models.ID(42), models.ID(1)).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(2))
+	mock.ExpectQuery(`SELECT count\(\*\) FROM "message_deliveries" WHERE message_id = \$1 AND user_id <> \$2`).WithArgs(models.ID(41), models.ID(1)).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	mock.ExpectCommit()
 
-	if err := service.AcknowledgeDeliveries(context.Background(), 7, []models.ID{41, 42, 41}); err != nil {
+	if err := service.AcknowledgeDeliveries(context.Background(), 7, []models.ID{42, 41, 42}); err != nil {
 		t.Fatal(err)
 	}
 	if membership.accessCalls != 2 || len(recorder.events) != 2 {
 		t.Fatalf("每条消息都应校验权限并产生回执事件: accesses=%d events=%d", membership.accessCalls, len(recorder.events))
 	}
-	if recorder.events[0].Type != realtime.EventDeliveryAck || recorder.events[0].Data["delivery_count"] != int64(1) || recorder.events[1].Data["delivery_count"] != int64(2) {
+	if recorder.events[0].Type != realtime.EventDeliveryAck || recorder.events[0].Data["delivery_count"] != int64(2) || recorder.events[1].Data["delivery_count"] != int64(1) {
 		t.Fatalf("delivery ACK 计数事件错误: %+v", recorder.events)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReadAcknowledgementLocksMessageBeforeCount(t *testing.T) {
+	recorder := &fakeEventRecorder{}
+	service, mock := newSQLMessageService(t, &fakeMessageMembership{}, nil, recorder)
+	mock.ExpectQuery(`SELECT \* FROM "messages" WHERE "messages"\."id" = \$1`).WithArgs(models.ID(42), 1).WillReturnRows(messageRow(42))
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT \* FROM "messages" WHERE "messages"\."id" = \$1 .* FOR UPDATE`).WithArgs(models.ID(42), 1).WillReturnRows(messageRow(42))
+	mock.ExpectExec(`INSERT INTO "message_reads"`).WillReturnResult(driver.RowsAffected(1))
+	mock.ExpectExec(`INSERT INTO "channel_reads"`).WillReturnResult(driver.RowsAffected(1))
+	mock.ExpectQuery(`SELECT count\(\*\) FROM "message_reads" WHERE message_id = \$1 AND user_id <> \$2`).WithArgs(models.ID(42), models.ID(1)).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(2))
+	mock.ExpectCommit()
+
+	if err := service.Read(context.Background(), 7, 42); err != nil {
+		t.Fatal(err)
+	}
+	if len(recorder.events) != 1 || recorder.events[0].Data["read_count"] != int64(2) {
+		t.Fatalf("read ACK 未使用事务内计数: %+v", recorder.events)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

@@ -12,6 +12,7 @@ export function isConfirmedReadAck(event: RealtimeEvent): boolean {
 
 export function invalidateRealtimeQueries(queryClient: QueryInvalidator, event: RealtimeEvent, message?: Message | null): void {
   if (message) {
+    void queryClient.invalidateQueries({ queryKey: ["messages", message.channel_id] });
     void queryClient.invalidateQueries({ queryKey: ["channels"] });
     if (message.type === "urgent") void queryClient.invalidateQueries({ queryKey: ["urgent-pending"] });
   }

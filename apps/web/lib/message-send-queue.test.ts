@@ -119,4 +119,52 @@ describe("MessageSendQueue", () => {
     expect(listener).toHaveBeenCalledTimes(1);
     expect(listener.mock.calls[0][0]).toHaveLength(3);
   });
+
+  it("stop 后进入 terminal 状态，中止在途且不发等待项或回调", async () => {
+    const first = deferred<Message>();
+    const signals: Array<AbortSignal | undefined> = [];
+    const send = vi.fn((_channelId: string, _input: SendMessageInput, _clientMsgId: string, signal?: AbortSignal) => {
+      signals.push(signal);
+      return first.promise;
+    });
+    const onSent = vi.fn();
+    const createId = vi.fn().mockReturnValueOnce("first-id").mockReturnValueOnce("second-id").mockReturnValue("after-stop");
+    const queue = new MessageSendQueue({ send, onSent, createId });
+    queue.enqueue("ch-1", input("在途"));
+    queue.enqueue("ch-1", input("等待"));
+    expect(send).toHaveBeenCalledTimes(1);
+
+    queue.stop();
+    expect(signals[0]?.aborted).toBe(true);
+    expect(queue.enqueue("ch-1", input("停止后"))).toBe("");
+    queue.retry("second-id");
+    queue.setPaused(false);
+    first.resolve(message("10", "ch-1", "first-id"));
+    await flushPromises();
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(onSent).not.toHaveBeenCalled();
+    expect(createId).toHaveBeenCalledTimes(2);
+    expect(queue.getItems()).toEqual([]);
+  });
+
+  it("StrictMode effect 重放后可重新启动队列并发送新项", async () => {
+    const first = new Promise<Message>(() => undefined);
+    const second = Promise.resolve(message("11", "ch-1", "id-2"));
+    const send = vi.fn().mockImplementationOnce(() => first).mockImplementationOnce(() => second);
+    const onSent = vi.fn();
+    let sequence = 0;
+    const queue = new MessageSendQueue({ send, onSent, createId: () => `id-${++sequence}` });
+    queue.enqueue("ch-1", input("第一轮"));
+    queue.stop();
+
+    queue.start();
+    const restarted = queue.enqueue("ch-1", input("第二轮"));
+    await flushPromises();
+
+    expect(restarted).toBe("id-2");
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(onSent).toHaveBeenCalledWith(expect.objectContaining({ id: "11", client_msg_id: "id-2" }));
+    expect(queue.getItems()).toHaveLength(0);
+  });
 });

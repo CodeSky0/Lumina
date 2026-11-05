@@ -23,17 +23,27 @@ export function MessageSendProvider({ children }: { children: ReactNode }) {
   const syncing = useRealtimeStore((state) => state.syncing);
   const [items, setItems] = useState<QueuedMessage[]>([]);
   const [queue] = useState(() => new MessageSendQueue({
-    send: (channelId, input, clientMsgId) => apiFetch<Message>(`/api/v1/channels/${encodeURIComponent(channelId)}/messages`, {
+    send: (channelId, input, clientMsgId, signal) => apiFetch<Message>(`/api/v1/channels/${encodeURIComponent(channelId)}/messages`, {
       method: "POST",
       body: { ...input, client_msg_id: clientMsgId },
+      signal,
     }),
     onSent: (message) => {
       queryClient.setQueryData<InfiniteData<MessagePage> | undefined>(["messages", message.channel_id, ""], (old) => prependMessageToPages(old, message));
+      void queryClient.invalidateQueries({ queryKey: ["messages", message.channel_id] });
       void queryClient.invalidateQueries({ queryKey: ["channels"] });
     },
   }));
 
-  useEffect(() => queue.subscribe(setItems), [queue]);
+  useEffect(() => {
+    queue.start();
+    setItems(queue.getItems());
+    const unsubscribe = queue.subscribe(setItems);
+    return () => {
+      unsubscribe();
+      queue.stop();
+    };
+  }, [queue]);
   useEffect(() => {
     queue.setPaused(status !== "connected" || syncing);
   }, [queue, status, syncing]);
@@ -46,7 +56,6 @@ export function MessageSendProvider({ children }: { children: ReactNode }) {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [items.length]);
-  useEffect(() => () => queue.stop(), [queue]);
 
   const value = useMemo<MessageSendContextValue>(() => ({
     items,

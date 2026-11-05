@@ -187,18 +187,19 @@ type MessageDelivery struct {
 }
 
 type RealtimeOutbox struct {
-	ID          ID             `json:"id" gorm:"primaryKey"`
-	EventID     string         `json:"event_id" gorm:"type:uuid;not null;uniqueIndex"`
-	EventType   string         `json:"event_type" gorm:"size:64;not null"`
-	ChannelID   *ID            `json:"channel_id,omitempty"`
-	Payload     datatypes.JSON `json:"payload" gorm:"type:jsonb;not null"`
-	OccurredAt  time.Time      `json:"occurred_at" gorm:"not null"`
-	CreatedAt   time.Time      `json:"created_at"`
-	PublishedAt *time.Time     `json:"published_at,omitempty"`
-	Attempts    int            `json:"attempts" gorm:"not null;default:0"`
-	AvailableAt time.Time      `json:"available_at" gorm:"not null"`
-	LockedAt    *time.Time     `json:"locked_at,omitempty"`
-	LockedBy    *string        `json:"locked_by,omitempty" gorm:"size:100"`
+	ID              ID             `json:"id" gorm:"primaryKey"`
+	EventID         string         `json:"event_id" gorm:"type:uuid;not null;uniqueIndex"`
+	EventType       string         `json:"event_type" gorm:"size:64;not null"`
+	ChannelID       *ID            `json:"channel_id,omitempty"`
+	Payload         datatypes.JSON `json:"payload" gorm:"type:jsonb;not null"`
+	OccurredAt      time.Time      `json:"occurred_at" gorm:"not null"`
+	CreatedAt       time.Time      `json:"created_at"`
+	PublishedAt     *time.Time     `json:"published_at,omitempty"`
+	Attempts        int            `json:"attempts" gorm:"not null;default:0"`
+	AvailableAt     time.Time      `json:"available_at" gorm:"not null"`
+	LockedAt        *time.Time     `json:"locked_at,omitempty"`
+	LockedBy        *string        `json:"locked_by,omitempty" gorm:"size:100"`
+	RecipientUserID *ID            `json:"recipient_user_id,omitempty"`
 }
 
 func (RealtimeOutbox) TableName() string { return "realtime_outbox" }

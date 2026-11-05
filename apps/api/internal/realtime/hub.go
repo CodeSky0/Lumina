@@ -143,9 +143,15 @@ func (h *Hub) unregisterLocked(client *Client) []models.ID {
 func (h *Hub) Broadcast(event Event) {
 	h.mu.Lock()
 	recipients := map[*Client]struct{}{}
-	if event.ChannelID == nil {
-		for client := range h.clients {
+	if event.RecipientUserID != nil {
+		for client := range h.byUser[*event.RecipientUserID] {
 			recipients[client] = struct{}{}
+		}
+	} else if event.ChannelID == nil {
+		if event.Type != EventUrgentConfirmed {
+			for client := range h.clients {
+				recipients[client] = struct{}{}
+			}
 		}
 	} else {
 		for client := range h.byChannel[*event.ChannelID] {

@@ -46,14 +46,15 @@ export function UrgentDialog() {
     queryFn: async () => normalizePending(await apiFetch<UrgentPendingData | Array<Message | Announcement>>("/api/v1/classroom/urgent-pending")),
   });
   const current = query.data?.[0];
-  const audio = useUrgentAudio(current?.id);
+  const currentKey = current ? `${current.kind}:${current.id}` : undefined;
+  const audio = useUrgentAudio(currentKey);
   const [escalated, setEscalated] = useState(false);
   useEffect(() => {
     setEscalated(false);
     if (!current) return;
     const timer = window.setTimeout(() => setEscalated(true), 30_000);
     return () => window.clearTimeout(timer);
-  }, [current?.id]);
+  }, [currentKey]);
   const confirmMutation = useMutation({
     mutationFn: async (item: PendingItem) => {
       const path = item.kind === "message" ? `/api/v1/messages/${encodeURIComponent(item.id)}/confirm` : `/api/v1/announcements/${encodeURIComponent(item.id)}/confirm`;

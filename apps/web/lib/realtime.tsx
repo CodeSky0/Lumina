@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode }
 import { useQueryClient } from "@tanstack/react-query";
 import type { InfiniteData } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
+import { deliveryAckScheduler, enqueueDeliveryAcks } from "@/lib/delivery-ack";
 import { messageFromEventData, prependMessageToPages } from "@/lib/messages";
 import { synchronizeRealtime } from "@/lib/message-sync";
 import { RealtimeBatch } from "@/lib/realtime-batch";
@@ -29,18 +30,23 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   const markSynced = useRealtimeStore((state) => state.markSynced);
   const activeChannelId = useRealtimeStore((state) => state.activeChannelId);
   const activeChannelRef = useRef(activeChannelId);
+  const generationRef = useRef(0);
   const listeners = useMemo(() => new Set<RealtimeListener>(), []);
 
   useEffect(() => { activeChannelRef.current = activeChannelId; }, [activeChannelId]);
 
   useEffect(() => {
+    const generation = ++generationRef.current;
+    const controller = new AbortController();
+    const isCurrent = () => generationRef.current === generation && !controller.signal.aborted;
     if (!userId) {
+      deliveryAckScheduler.stop();
       setStatus("idle");
       setSyncing(false);
-      return;
+      return () => controller.abort();
     }
+    deliveryAckScheduler.start(userId);
     const batch = new RealtimeBatch((events) => {
-      const deliveries = new Set<string>();
       for (const event of events) {
         const message = event.type === "new_message" ? messageFromEventData(event.data) : null;
         if (message) {
@@ -48,16 +54,13 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
             { queryKey: ["messages", message.channel_id, ""] },
             (old) => prependMessageToPages(old, message),
           );
-          if (message.sender_id !== userId) deliveries.add(message.id);
+          enqueueDeliveryAcks([message], userId);
           if (message.sender_id !== userId && message.channel_id !== activeChannelRef.current) {
             window.dispatchEvent(new CustomEvent("lumina:message-notification", { detail: { title: message.sender_name, body: message.content.slice(0, 30) } }));
           }
         }
         invalidateRealtimeQueries(queryClient, event, message);
         for (const listener of listeners) listener(event);
-      }
-      if (deliveries.size > 0) {
-        void apiFetch<void>("/api/v1/messages/delivery-ack", { method: "POST", body: { message_ids: Array.from(deliveries) } }).catch(() => undefined);
       }
     });
     const client = new RealtimeClient({
@@ -67,18 +70,22 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       },
       onStatus: setStatus,
       onOpen: () => {
+        if (!isCurrent()) return;
         setSyncing(true);
         void queryClient.invalidateQueries();
-        void synchronizeRealtime(queryClient, activeChannelRef.current)
-          .catch(() => queryClient.invalidateQueries())
-          .finally(markSynced);
+        void deliveryAckScheduler.flush();
+        void synchronizeRealtime(queryClient, activeChannelRef.current, { signal: controller.signal, userId })
+          .catch(() => isCurrent() ? queryClient.invalidateQueries() : undefined)
+          .finally(() => { if (isCurrent()) markSynced(); });
       },
       onEvent: (event) => batch.push(event),
     });
     client.start();
     return () => {
+      controller.abort();
       batch.stop();
       client.stop();
+      deliveryAckScheduler.stop(userId);
     };
   }, [userId, listeners, queryClient, setStatus, setSyncing, markSynced]);
 

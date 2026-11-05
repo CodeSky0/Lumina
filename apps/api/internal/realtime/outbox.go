@@ -23,9 +23,11 @@ const (
 
 type outboxRepository interface {
 	Claim(ctx context.Context, instanceID string, limit int, now time.Time) ([]models.RealtimeOutbox, error)
-	MarkPublished(ctx context.Context, id models.ID, publishedAt time.Time) error
-	MarkFailed(ctx context.Context, id models.ID, attempts int, availableAt time.Time) error
+	MarkPublished(ctx context.Context, id models.ID, claimToken string, publishedAt time.Time) error
+	MarkFailed(ctx context.Context, id models.ID, claimToken string, attempts int, availableAt time.Time) error
 }
+
+var ErrOutboxLeaseLost = errors.New("Outbox 租约已失效")
 
 type OutboxStore struct {
 	db *gorm.DB
@@ -53,11 +55,11 @@ func (s *OutboxStore) Record(tx *gorm.DB, event Event) error {
 		return fmt.Errorf("序列化 Outbox 事件: %w", err)
 	}
 	now := time.Now().UTC()
-	record := models.RealtimeOutbox{EventID: event.EventID, EventType: event.Type, ChannelID: event.ChannelID, Payload: datatypes.JSON(payload), OccurredAt: event.OccurredAt, AvailableAt: now, CreatedAt: now}
+	record := models.RealtimeOutbox{EventID: event.EventID, EventType: event.Type, ChannelID: event.ChannelID, RecipientUserID: event.RecipientUserID, Payload: datatypes.JSON(payload), OccurredAt: event.OccurredAt, AvailableAt: now, CreatedAt: now}
 	return tx.Create(&record).Error
 }
 
-func (s *OutboxStore) Claim(ctx context.Context, instanceID string, limit int, now time.Time) ([]models.RealtimeOutbox, error) {
+func (s *OutboxStore) Claim(ctx context.Context, _ string, limit int, now time.Time) ([]models.RealtimeOutbox, error) {
 	if limit <= 0 {
 		limit = defaultOutboxBulk
 	}
@@ -69,22 +71,43 @@ func (s *OutboxStore) Claim(ctx context.Context, instanceID string, limit int, n
 			Order("id ASC").Limit(limit).Find(&records).Error; err != nil {
 			return err
 		}
-		for _, record := range records {
-			if err := tx.Model(&models.RealtimeOutbox{}).Where("id = ?", record.ID).Updates(map[string]any{"locked_at": now, "locked_by": instanceID}).Error; err != nil {
-				return err
+		for i := range records {
+			claimToken := uuid.NewString()
+			result := tx.Model(&models.RealtimeOutbox{}).Where("id = ?", records[i].ID).Updates(map[string]any{"locked_at": now, "locked_by": claimToken})
+			if result.Error != nil {
+				return result.Error
 			}
+			if result.RowsAffected != 1 {
+				return ErrOutboxLeaseLost
+			}
+			records[i].LockedAt = &now
+			records[i].LockedBy = &claimToken
 		}
 		return nil
 	})
 	return records, err
 }
 
-func (s *OutboxStore) MarkPublished(ctx context.Context, id models.ID, publishedAt time.Time) error {
-	return s.db.WithContext(ctx).Model(&models.RealtimeOutbox{}).Where("id = ? AND published_at IS NULL", id).Updates(map[string]any{"published_at": publishedAt, "locked_at": nil, "locked_by": nil}).Error
+func (s *OutboxStore) MarkPublished(ctx context.Context, id models.ID, claimToken string, publishedAt time.Time) error {
+	result := s.db.WithContext(ctx).Model(&models.RealtimeOutbox{}).Where("id = ? AND published_at IS NULL AND locked_by = ?", id, claimToken).Updates(map[string]any{"published_at": publishedAt, "locked_at": nil, "locked_by": nil})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return ErrOutboxLeaseLost
+	}
+	return nil
 }
 
-func (s *OutboxStore) MarkFailed(ctx context.Context, id models.ID, attempts int, availableAt time.Time) error {
-	return s.db.WithContext(ctx).Model(&models.RealtimeOutbox{}).Where("id = ? AND published_at IS NULL", id).Updates(map[string]any{"attempts": attempts, "available_at": availableAt, "locked_at": nil, "locked_by": nil}).Error
+func (s *OutboxStore) MarkFailed(ctx context.Context, id models.ID, claimToken string, attempts int, availableAt time.Time) error {
+	result := s.db.WithContext(ctx).Model(&models.RealtimeOutbox{}).Where("id = ? AND published_at IS NULL AND locked_by = ?", id, claimToken).Updates(map[string]any{"attempts": attempts, "available_at": availableAt, "locked_at": nil, "locked_by": nil})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return ErrOutboxLeaseLost
+	}
+	return nil
 }
 
 type OutboxRelay struct {
@@ -115,19 +138,23 @@ func (r *OutboxRelay) PublishBatch(ctx context.Context) error {
 	}
 	var result error
 	for _, record := range records {
+		claimToken := ""
+		if record.LockedBy != nil {
+			claimToken = *record.LockedBy
+		}
 		event, err := eventFromOutbox(record)
 		if err == nil {
 			err = r.publisher.Publish(ctx, event)
 		}
 		if err == nil {
-			if markErr := r.repo.MarkPublished(ctx, record.ID, r.now()); markErr != nil {
+			if markErr := r.repo.MarkPublished(ctx, record.ID, claimToken, r.now()); markErr != nil {
 				result = errors.Join(result, markErr)
 			}
 			continue
 		}
 		result = errors.Join(result, err)
 		next := r.now().Add(outboxBackoff(record.Attempts))
-		if markErr := r.repo.MarkFailed(ctx, record.ID, record.Attempts+1, next); markErr != nil {
+		if markErr := r.repo.MarkFailed(ctx, record.ID, claimToken, record.Attempts+1, next); markErr != nil {
 			result = errors.Join(result, markErr)
 		}
 	}
@@ -154,7 +181,7 @@ func eventFromOutbox(record models.RealtimeOutbox) (Event, error) {
 	if err := json.Unmarshal(record.Payload, &data); err != nil {
 		return Event{}, fmt.Errorf("反序列化 Outbox 事件: %w", err)
 	}
-	return Event{EventID: record.EventID, Type: record.EventType, ChannelID: record.ChannelID, OccurredAt: record.OccurredAt, Data: data}, nil
+	return Event{EventID: record.EventID, Type: record.EventType, ChannelID: record.ChannelID, RecipientUserID: record.RecipientUserID, OccurredAt: record.OccurredAt, Data: data}, nil
 }
 
 func outboxBackoff(attempt int) time.Duration {

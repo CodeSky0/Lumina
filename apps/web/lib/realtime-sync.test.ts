@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { invalidateRealtimeQueries, isConfirmedReadAck } from "@/lib/realtime-sync";
-import type { RealtimeEvent, RealtimeEventType } from "@/lib/types";
+import type { Message, RealtimeEvent, RealtimeEventType } from "@/lib/types";
 
 function event(type: RealtimeEventType, data: unknown = {}): RealtimeEvent {
   return { event_id: `evt-${type}`, type, channel_id: "ch-1", occurred_at: "2026-10-31T12:00:00Z", data };
@@ -34,6 +34,14 @@ describe("实时事件缓存失效", () => {
     invalidateRealtimeQueries(client, event("announcement_invalidated", { announcement_id: "a1" }));
     expect(client.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["announcements"] });
     expect(client.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["urgent-pending"] });
+  });
+
+  it("new_message 失效整个通道消息前缀", () => {
+    const client = invalidator();
+    const message: Message = { id: "m-1", channel_id: "ch-1", sender_id: "teacher-1", sender_name: "教师", type: "text", content: "搜索命中", metadata: {}, is_pinned: false, created_at: "2026-11-04T12:00:00Z", delivery_count: 0, read_count: 0 };
+    invalidateRealtimeQueries(client, event("new_message", message), message);
+    expect(client.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["messages", "ch-1"] });
+    expect(client.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["channels"] });
   });
 
   it("presence 只触发 channels 重新同步", () => {

@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"log"
+	"sort"
 	"strings"
 	"time"
 
@@ -164,9 +165,22 @@ func (s *AnnouncementService) Confirm(ctx context.Context, userID, announcementI
 	if err := requireClassroomConfirmation(user); err != nil {
 		return nil, err
 	}
+	recipientSet := map[models.ID]struct{}{userID: {}, announcement.PublisherID: {}}
+	var adminIDs []models.ID
+	if err := s.db.WithContext(ctx).Model(&models.User{}).Where("role = ? AND active = true", models.RoleAdmin).Order("id ASC").Pluck("id", &adminIDs).Error; err != nil {
+		return nil, apperror.Internal(err)
+	}
+	for _, adminID := range adminIDs {
+		recipientSet[adminID] = struct{}{}
+	}
+	recipientIDs := make([]models.ID, 0, len(recipientSet))
+	for recipientID := range recipientSet {
+		recipientIDs = append(recipientIDs, recipientID)
+	}
+	sort.Slice(recipientIDs, func(i, j int) bool { return recipientIDs[i] < recipientIDs[j] })
 	now := s.now()
 	confirmation := models.AnnouncementConfirmation{AnnouncementID: announcementID, UserID: userID, ConfirmedAt: now}
-	event := realtime.NewEvent(realtime.EventUrgentConfirmed, nil, map[string]any{"kind": "announcement", "announcement_id": announcementID, "user_id": userID})
+	events := make([]realtime.Event, 0, len(recipientIDs))
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&confirmation).Error; err != nil {
 			return err
@@ -174,9 +188,14 @@ func (s *AnnouncementService) Confirm(ctx context.Context, userID, announcementI
 		if err := tx.Where("announcement_id = ? AND user_id = ?", announcementID, userID).First(&confirmation).Error; err != nil {
 			return err
 		}
-		event.Data["confirmed_at"] = confirmation.ConfirmedAt
-		if s.recorder != nil {
-			return s.recorder.Record(tx, event)
+		for _, recipientID := range recipientIDs {
+			event := realtime.NewDirectedEvent(realtime.EventUrgentConfirmed, recipientID, map[string]any{"kind": "announcement", "announcement_id": announcementID, "user_id": userID, "confirmed_at": confirmation.ConfirmedAt})
+			events = append(events, event)
+			if s.recorder != nil {
+				if err := s.recorder.Record(tx, event); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	})
@@ -184,7 +203,9 @@ func (s *AnnouncementService) Confirm(ctx context.Context, userID, announcementI
 		return nil, apperror.Internal(err)
 	}
 	if s.recorder == nil {
-		s.publish(ctx, event)
+		for _, event := range events {
+			s.publish(ctx, event)
+		}
 	}
 	return &confirmation.ConfirmedAt, nil
 }

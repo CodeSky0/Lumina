@@ -9,7 +9,7 @@ import { MessageSendProvider } from "@/lib/message-sender";
 import { useSessionStore } from "@/stores/session";
 import { ConnectionBanner } from "@/components/ui/connection-banner";
 import { RealtimeNotification } from "@/components/ui/realtime-notification";
-import { TeacherUrgentDialog } from "@/components/urgent/teacher-urgent-dialog";
+import { GlobalUrgentHost } from "@/components/urgent/global-urgent-host";
 
 export function Providers({ children }: { children: ReactNode }) {
   const userId = useSessionStore((state) => state.user?.id);
@@ -34,7 +34,7 @@ export function Providers({ children }: { children: ReactNode }) {
           <MessageSendProvider key={userId ?? "anonymous"}>
             <ConnectionBanner />
             <RealtimeNotification />
-            <TeacherUrgentDialog />
+            <GlobalUrgentHost />
             {children}
           </MessageSendProvider>
         </RealtimeProvider>

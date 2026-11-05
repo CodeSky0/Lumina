@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"sort"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -100,9 +101,18 @@ func (s *MessageService) AcknowledgeDeliveries(ctx context.Context, userID model
 	if len(ordered) == 0 {
 		return nil
 	}
+	lockIDs := make([]models.ID, len(ordered))
+	for i := range ordered {
+		lockIDs[i] = ordered[i].ID
+	}
+	sort.Slice(lockIDs, func(i, j int) bool { return lockIDs[i] < lockIDs[j] })
 	now := s.now()
 	events := make([]realtime.Event, 0, len(ordered))
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var lockedMessages []models.Message
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id IN ?", lockIDs).Order("id ASC").Find(&lockedMessages).Error; err != nil {
+			return err
+		}
 		deliveries := make([]models.MessageDelivery, 0, len(ordered))
 		for _, message := range ordered {
 			deliveries = append(deliveries, models.MessageDelivery{MessageID: message.ID, UserID: userID, DeliveredAt: now})

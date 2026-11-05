@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React, { type ReactNode } from "react";
-import { act, cleanup, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiFetch } from "@/lib/api";
@@ -17,6 +17,7 @@ afterEach(() => {
   cleanup();
   useSessionStore.getState().clearSession();
   useRealtimeStore.getState().setStatus("idle");
+  useRealtimeStore.getState().setSyncing(false);
   vi.mocked(apiFetch).mockReset();
 });
 
@@ -43,5 +44,35 @@ describe("消息发送 Provider", () => {
     window.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
     vi.useRealTimers();
+  });
+
+  it("发送成功失效整个通道消息查询前缀", async () => {
+    useSessionStore.getState().setSession({ access_token: "token", expires_at: "2026-11-05T12:00:00Z", user: { id: "teacher-1", username: "teacher", display_name: "教师", role: "teacher" } });
+    useRealtimeStore.getState().setStatus("connected");
+    vi.mocked(apiFetch).mockResolvedValue(message("10", "client-1"));
+    const client = new QueryClient();
+    const invalidate = vi.spyOn(client, "invalidateQueries").mockResolvedValue(undefined);
+    const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}><MessageSendProvider>{children}</MessageSendProvider></QueryClientProvider>;
+    const { result } = renderHook(() => useMessageSender(), { wrapper });
+
+    act(() => { result.current.enqueue("ch-1", { type: "text", content: "新消息" }); });
+
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ["messages", "ch-1"] }));
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["channels"] });
+  });
+
+  it("StrictMode effect 重放后队列仍可发送", async () => {
+    useSessionStore.getState().setSession({ access_token: "token", expires_at: "2026-11-05T12:00:00Z", user: { id: "teacher-1", username: "teacher", display_name: "教师", role: "teacher" } });
+    useRealtimeStore.getState().setStatus("connected");
+    vi.mocked(apiFetch).mockResolvedValue(message("10", "strict-id"));
+    const client = new QueryClient();
+    const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}><React.StrictMode><MessageSendProvider>{children}</MessageSendProvider></React.StrictMode></QueryClientProvider>;
+    const { result } = renderHook(() => useMessageSender(), { wrapper });
+
+    let id = "";
+    act(() => { id = result.current.enqueue("ch-1", { type: "text", content: "StrictMode 消息" }); });
+
+    expect(id).not.toBe("");
+    await waitFor(() => expect(vi.mocked(apiFetch)).toHaveBeenCalled());
   });
 });

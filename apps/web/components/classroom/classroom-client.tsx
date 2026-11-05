@@ -17,7 +17,6 @@ import { ListSkeleton } from "@/components/ui/skeleton";
 import { SubjectIcon } from "@/components/classroom/subject-icon";
 import { AnnouncementBar } from "@/components/classroom/announcement-bar";
 import { ClassroomChat } from "@/components/classroom/classroom-chat";
-import { UrgentDialog } from "@/components/classroom/urgent-dialog";
 
 function ClassroomWorkspace() {
   const { logout } = useAuth();
@@ -54,7 +53,6 @@ function ClassroomWorkspace() {
         </section>
       </main>
       <ClassroomChat channel={selected} onClose={() => setSelected(undefined)} />
-      <UrgentDialog />
     </div>
   );
 }

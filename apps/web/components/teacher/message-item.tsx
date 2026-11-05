@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { InlineError } from "@/components/ui/async-state";
 import { FileAttachment } from "@/components/teacher/file-attachment";
-import { ConfirmationStatus } from "@/components/urgent/confirmation-status";
+import { ConfirmationDetails } from "@/components/urgent/confirmation-status";
 
 interface MessageItemProps {
   message: Message;
@@ -115,7 +115,7 @@ export function MessageItem({ message, currentUserId, replyTarget, large = false
             <><p className={cn("whitespace-pre-wrap break-words leading-6", large && "text-lg leading-8")}>{message.content}</p>{(message.type === "image" || message.type === "file") && <FileAttachment message={message} large={large} />}</>
           )}
         </div>
-        {own && urgent && !message.delivery_state && !message.deleted_at && <details className="mt-2 w-full"><summary className="cursor-pointer text-xs font-medium text-indigo-600">查看班级确认状态</summary><ConfirmationStatus kind="message" id={message.id} /></details>}
+        {own && urgent && !message.delivery_state && !message.deleted_at && <ConfirmationDetails kind="message" id={message.id} summary="查看班级确认状态" className="mt-2 w-full" summaryClassName="cursor-pointer text-xs font-medium text-indigo-600" />}
         <div className={cn("mt-1.5 flex min-h-7 items-center gap-1 text-zinc-400", own && "flex-row-reverse")}>
           {own && !message.deleted_at && (message.delivery_state === "sending" ? (
             <span className={cn("mr-1 flex items-center gap-1 text-xs", large && "text-base")}><Checks className="h-3.5 w-3.5" />发送中</span>

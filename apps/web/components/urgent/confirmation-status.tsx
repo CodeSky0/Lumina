@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
@@ -28,5 +29,15 @@ export function ConfirmationStatus({ kind, id }: { kind: "message" | "announceme
       <p className="text-sm font-semibold text-zinc-800">已确认 {confirmed} / {items.length} 个班级</p>
       <ul className="mt-2 space-y-1.5">{items.map((item) => <li key={item.user_id} className="flex items-center justify-between gap-3 text-xs"><span className="truncate text-zinc-600">{item.class_name}</span><span className={item.confirmed ? "text-emerald-600" : "font-medium text-red-600"}>{item.confirmed && item.confirmed_at ? `已确认 ${formatDateTime(item.confirmed_at)}` : "未确认"}</span></li>)}</ul>
     </div>
+  );
+}
+
+export function ConfirmationDetails({ kind, id, summary, className, summaryClassName }: { kind: "message" | "announcement"; id: string; summary: string; className?: string; summaryClassName?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details className={className} onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary className={summaryClassName}>{summary}</summary>
+      {open && <ConfirmationStatus kind={kind} id={id} />}
+    </details>
   );
 }

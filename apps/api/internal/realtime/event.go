@@ -24,15 +24,22 @@ const (
 )
 
 type Event struct {
-	EventID    string         `json:"event_id"`
-	Type       string         `json:"type"`
-	ChannelID  *models.ID     `json:"channel_id,omitempty"`
-	OccurredAt time.Time      `json:"occurred_at"`
-	Data       map[string]any `json:"data"`
+	EventID         string         `json:"event_id"`
+	Type            string         `json:"type"`
+	ChannelID       *models.ID     `json:"channel_id,omitempty"`
+	RecipientUserID *models.ID     `json:"recipient_user_id,omitempty"`
+	OccurredAt      time.Time      `json:"occurred_at"`
+	Data            map[string]any `json:"data"`
 }
 
 func NewEvent(eventType string, channelID *models.ID, data map[string]any) Event {
 	return Event{EventID: uuid.NewString(), Type: eventType, ChannelID: channelID, OccurredAt: time.Now().UTC(), Data: data}
+}
+
+func NewDirectedEvent(eventType string, recipientUserID models.ID, data map[string]any) Event {
+	event := NewEvent(eventType, nil, data)
+	event.RecipientUserID = &recipientUserID
+	return event
 }
 
 type Publisher interface {

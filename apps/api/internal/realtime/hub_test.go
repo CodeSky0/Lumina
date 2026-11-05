@@ -124,6 +124,50 @@ func TestHubRechecksChannelPermissionBeforeDelivery(t *testing.T) {
 	}
 }
 
+func TestUrgentConfirmedWithoutRecipientIsNotGloballyBroadcast(t *testing.T) {
+	hub := NewHub(nil, nil, nil)
+	client := testClient(hub, 1)
+	hub.Register(client)
+	defer hub.Unregister(client)
+	hub.Broadcast(NewEvent(EventUrgentConfirmed, nil, map[string]any{"announcement_id": models.ID(9), "user_id": models.ID(1)}))
+	select {
+	case <-client.send:
+		t.Fatal("缺少接收者的公告确认事件不得全局广播")
+	default:
+	}
+}
+
+func TestDirectedEventReachesAllUserTabsWithoutGlobalLeak(t *testing.T) {
+	hub := NewHub(nil, nil, nil)
+	firstTab := testClient(hub, 1)
+	secondTab := testClient(hub, 1)
+	outsider := testClient(hub, 2)
+	hub.Register(firstTab)
+	hub.Register(secondTab)
+	hub.Register(outsider)
+	defer hub.Unregister(firstTab)
+	defer hub.Unregister(secondTab)
+	defer hub.Unregister(outsider)
+
+	event := NewDirectedEvent(EventUrgentConfirmed, 1, map[string]any{"announcement_id": models.ID(9), "user_id": models.ID(1)})
+	hub.Broadcast(event)
+	for _, client := range []*Client{firstTab, secondTab} {
+		select {
+		case received := <-client.send:
+			if received.EventID != event.EventID || received.RecipientUserID == nil || *received.RecipientUserID != 1 {
+				t.Fatalf("定向事件信封错误: %+v", received)
+			}
+		case <-time.After(time.Second):
+			t.Fatal("目标账号的标签页未收到定向事件")
+		}
+	}
+	select {
+	case <-outsider.send:
+		t.Fatal("无关账号收到定向确认事件")
+	default:
+	}
+}
+
 func TestGlobalInvalidationDoesNotRequireChannelSnapshot(t *testing.T) {
 	authorizer := &mutableAuthorizer{allowed: false}
 	hub := NewHub(authorizer, nil, nil)

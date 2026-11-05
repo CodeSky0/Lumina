@@ -163,6 +163,9 @@ func (s *MessageService) Send(ctx context.Context, userID, channelID models.ID, 
 	created := false
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if clientMsgID != nil {
+			if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?), hashtext(?))", userID.String(), *clientMsgID).Error; err != nil {
+				return err
+			}
 			var existing models.Message
 			err := tx.Where("sender_id = ? AND client_msg_id = ?", userID, *clientMsgID).First(&existing).Error
 			if err == nil {
@@ -404,19 +407,18 @@ func CanRecall(message models.Message, userID models.ID, now time.Time) bool {
 }
 
 func (s *MessageService) Read(ctx context.Context, userID, messageID models.ID) error {
-	message, err := s.markRead(ctx, userID, messageID, false)
+	message, count, err := s.markRead(ctx, userID, messageID, false)
 	if err != nil {
 		return err
 	}
 	if s.recorder == nil {
-		count, _ := s.readCount(ctx, messageID)
 		s.publish(ctx, realtime.NewEvent(realtime.EventReadAck, &message.ChannelID, map[string]any{"message_id": messageID, "user_id": userID, "read_count": count}))
 	}
 	return nil
 }
 
 func (s *MessageService) Confirm(ctx context.Context, userID, messageID models.ID) (*time.Time, error) {
-	message, err := s.markRead(ctx, userID, messageID, true)
+	message, _, err := s.markRead(ctx, userID, messageID, true)
 	if err != nil {
 		return nil, err
 	}
@@ -431,28 +433,34 @@ func (s *MessageService) Confirm(ctx context.Context, userID, messageID models.I
 	return &confirmation.ConfirmedAt, nil
 }
 
-func (s *MessageService) markRead(ctx context.Context, userID, messageID models.ID, confirm bool) (*models.Message, error) {
+func (s *MessageService) markRead(ctx context.Context, userID, messageID models.ID, confirm bool) (*models.Message, int64, error) {
 	var message models.Message
 	if err := s.db.WithContext(ctx).First(&message, messageID).Error; err != nil {
-		return nil, apperror.NotFound("MESSAGE_NOT_FOUND", "消息不存在")
+		return nil, 0, apperror.NotFound("MESSAGE_NOT_FOUND", "消息不存在")
 	}
 	if err := s.membership.RequireAccess(ctx, userID, message.ChannelID); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if confirm {
 		var user models.User
 		if err := s.db.WithContext(ctx).First(&user, userID).Error; err != nil {
-			return nil, apperror.Unauthorized("ACCOUNT_DISABLED", "账号不可用")
+			return nil, 0, apperror.Unauthorized("ACCOUNT_DISABLED", "账号不可用")
 		}
 		if err := requireClassroomConfirmation(user); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		if message.Type != models.MessageUrgent {
-			return nil, apperror.BadRequest("CONFIRM_NOT_REQUIRED", "只有紧急消息需要确认")
+			return nil, 0, apperror.BadRequest("CONFIRM_NOT_REQUIRED", "只有紧急消息需要确认")
 		}
 	}
 	now := s.now()
+	var count int64
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var lockedMessage models.Message
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&lockedMessage, messageID).Error; err != nil {
+			return err
+		}
+		message = lockedMessage
 		read := models.MessageRead{MessageID: messageID, UserID: userID, ReadAt: now}
 		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&read).Error; err != nil {
 			return err
@@ -467,11 +475,10 @@ func (s *MessageService) markRead(ctx context.Context, userID, messageID models.
 		if err := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "channel_id"}, {Name: "user_id"}}, DoUpdates: clause.Assignments(map[string]any{"last_read_message_id": gorm.Expr("GREATEST(COALESCE(channel_reads.last_read_message_id, 0), excluded.last_read_message_id)"), "updated_at": now})}).Create(&position).Error; err != nil {
 			return err
 		}
+		if err := tx.Model(&models.MessageRead{}).Where("message_id = ? AND user_id <> ?", messageID, message.SenderID).Count(&count).Error; err != nil {
+			return err
+		}
 		if s.recorder != nil {
-			var count int64
-			if err := tx.Model(&models.MessageRead{}).Where("message_id = ? AND user_id <> ?", messageID, message.SenderID).Count(&count).Error; err != nil {
-				return err
-			}
 			data := map[string]any{"message_id": messageID, "user_id": userID, "read_count": count}
 			if confirm {
 				var confirmation models.MessageConfirmation
@@ -487,14 +494,13 @@ func (s *MessageService) markRead(ctx context.Context, userID, messageID models.
 			if confirm {
 				return s.recorder.Record(tx, realtime.NewEvent(realtime.EventUrgentConfirmed, &message.ChannelID, map[string]any{"kind": "message", "message_id": messageID, "user_id": userID, "confirmed_at": data["confirmed_at"]}))
 			}
-			return nil
 		}
 		return nil
 	})
 	if err != nil {
-		return nil, apperror.Internal(err)
+		return nil, 0, apperror.Internal(err)
 	}
-	return &message, nil
+	return &message, count, nil
 }
 
 type BatchTarget struct {
