@@ -93,7 +93,6 @@ export function MessageItem({ message, currentUserId, replyTarget, large = false
   }
 
   const urgent = message.type === "urgent";
-  const notice = message.type === "notice";
   return (
     <article ref={articleRef} className={cn("group flex gap-3 px-1 py-3", own && "flex-row-reverse")} aria-label={`${message.sender_name}发送的消息`}>
       <div className={cn("flex h-9 w-9 shrink-0 select-none items-center justify-center rounded-md text-label-12 font-medium", own ? "bg-accent/10 text-accent" : "bg-neutral-3 text-neutral-7", large && "h-12 w-12 text-copy-14")} aria-hidden="true">{message.sender_name.slice(0, 1)}</div>
@@ -102,12 +101,11 @@ export function MessageItem({ message, currentUserId, replyTarget, large = false
         <div className={cn(
           "rounded-lg border px-4 py-3",
           own ? "rounded-tr-md border-accent/20 bg-accent/8 text-neutral-9" : "rounded-tl-md border-border bg-neutral-2 text-neutral-9",
-          notice && "border-warning/25 bg-warning/8 text-neutral-9",
           urgent && "border-error/25 bg-error/8 text-neutral-9",
           failed && "border-error/30 bg-neutral-2 text-neutral-7",
           large && "px-5 py-4 text-copy-16 leading-8",
         )}>
-          {(notice || urgent) && <Badge tone={urgent ? "red" : "yellow"} className="mb-2">{urgent ? "紧急通知" : "普通通知"}</Badge>}
+          {urgent && <Badge tone="red" className="mb-2">紧急通知 · 需教室确认</Badge>}
           {message.reply_to_id && <div className={cn("mb-2 border-l-2 pl-2 text-label-12 opacity-75", own ? "border-accent/30" : "border-neutral-5", large && "text-copy-14")}>{replyTarget ? `回复 ${replyTarget.sender_name}：${replyTarget.content}` : "回复一条历史消息"}</div>}
           {message.deleted_at ? <p className={cn("italic opacity-65", large ? "text-copy-16" : "text-copy-14")}>消息已撤回</p> : isEditing ? (
             <div className="w-72 max-w-full space-y-3 text-neutral-9"><Textarea value={editContent} onChange={(event) => setEditContent(event.target.value)} maxLength={2000} aria-label="编辑消息内容" /><InlineError error={editError} /><div className="flex justify-end gap-2"><Button size="sm" variant="secondary" onClick={() => setIsEditing(false)}>取消</Button><Button size="sm" onClick={saveEdit} isLoading={editMutation.isPending}>保存</Button></div></div>

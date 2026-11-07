@@ -17,11 +17,12 @@ describe("管理资源表单真实 DTO", () => {
     expect(validateResource("classes", { name: "一班", grade: "高一", classroom_username: "room", classroom_password: "Classroom@2026", active: true }, false)).toContain("1–12");
   });
 
-  it("教师新建需要密码，编辑允许留空密码并使用 active", () => {
-    const base = { username: "teacher", display_name: "教师", password: "", active: true };
+  it("教师新建需要科目与密码，编辑允许留空密码并使用 active", () => {
+    const base = { username: "teacher", display_name: "教师", subject_id: "subject-1", password: "", active: true };
     expect(validateResource("teachers", base, false)).toBe("请填写登录密码");
+    expect(validateResource("teachers", { username: "teacher", display_name: "教师", password: "a-secure-password", active: true }, false)).toBe("请填写教授科目");
     expect(validateResource("teachers", base, true)).toBeNull();
-    expect(buildResourceBody("teachers", base, true)).toEqual({ username: "teacher", display_name: "教师", active: true });
+    expect(buildResourceBody("teachers", base, true)).toEqual({ username: "teacher", display_name: "教师", subject_id: "subject-1", active: true });
   });
 
   it("科目 icon 必填", () => {

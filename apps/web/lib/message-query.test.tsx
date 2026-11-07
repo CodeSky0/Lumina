@@ -31,7 +31,9 @@ describe("REST 历史消息送达确认", () => {
     const { result } = renderHook(() => useChannelMessages("ch-1", "历史"), { wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/v1/messages/delivery-ack", { method: "POST", body: { message_ids: ["m-2"] } }));
+    await waitFor(() => expect(vi.mocked(apiFetch).mock.calls.some(([path]) => path === "/api/v1/messages/delivery-ack")).toBe(true));
+    const ackCall = vi.mocked(apiFetch).mock.calls.find(([path]) => path === "/api/v1/messages/delivery-ack");
+    expect(ackCall?.[1]).toMatchObject({ method: "POST", body: { message_ids: ["m-2"] } });
     expect(vi.mocked(apiFetch).mock.calls.filter(([path]) => path === "/api/v1/messages/delivery-ack")).toHaveLength(1);
   });
 });

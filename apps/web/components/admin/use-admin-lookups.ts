@@ -11,19 +11,25 @@ export const LOOKUP_PAGE_SIZES = {
   channels: 50,
 } as const;
 
-export function useAdminLookups(enabled = true) {
+export type LookupResource = keyof typeof LOOKUP_PAGE_SIZES;
+
+export const ALL_LOOKUPS: readonly LookupResource[] = ["classes", "teachers", "subjects", "channels"];
+
+export function useAdminLookups(enabled = true, resources: readonly LookupResource[] = ALL_LOOKUPS) {
+  const selected = ALL_LOOKUPS.filter((resource) => resources.includes(resource));
   const results = useQueries({
-    queries: (Object.keys(LOOKUP_PAGE_SIZES) as Array<keyof typeof LOOKUP_PAGE_SIZES>).map((resource) => ({
+    queries: selected.map((resource) => ({
       queryKey: ["admin", resource, "lookup"],
       enabled,
       queryFn: async () => fetchAllAdminPages<AdminClass | TeacherAccount | Subject | AdminChannel>(`/api/v1/admin/${resource}`, LOOKUP_PAGE_SIZES[resource]),
     })),
   });
+  const dataFor = (resource: LookupResource) => results[selected.indexOf(resource)]?.data ?? [];
   return {
-    classes: (results[0].data ?? []) as AdminClass[],
-    teachers: (results[1].data ?? []) as TeacherAccount[],
-    subjects: (results[2].data ?? []) as Subject[],
-    channels: (results[3].data ?? []) as AdminChannel[],
+    classes: dataFor("classes") as AdminClass[],
+    teachers: dataFor("teachers") as TeacherAccount[],
+    subjects: dataFor("subjects") as Subject[],
+    channels: dataFor("channels") as AdminChannel[],
     isPending: enabled && results.some((result) => result.isPending),
     error: enabled ? results.find((result) => result.error)?.error : undefined,
     refetch: () => Promise.all(results.map((result) => result.refetch())),

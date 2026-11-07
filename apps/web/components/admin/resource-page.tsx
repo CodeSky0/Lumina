@@ -9,7 +9,7 @@ import { fetchAdminPage } from "@/lib/admin-api";
 import type { ResourceKind } from "@/lib/admin";
 import { RESOURCE_CONFIGS } from "@/components/admin/resource-config";
 import { ResourceForm, type ResourceRow } from "@/components/admin/resource-form";
-import { useAdminLookups } from "@/components/admin/use-admin-lookups";
+import { useAdminLookups, type LookupResource } from "@/components/admin/use-admin-lookups";
 import { DeviceCodeDialog } from "@/components/admin/device-code-dialog";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,9 @@ import { EmptyState, ErrorState } from "@/components/ui/async-state";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const PAGE_SIZE = 50;
+const CHANNEL_LOOKUPS: readonly LookupResource[] = ["classes"];
+const TEACHER_LOOKUPS: readonly LookupResource[] = ["subjects"];
+const NO_LOOKUPS: readonly LookupResource[] = [];
 
 export function ResourcePage({ kind }: { kind: ResourceKind }) {
   const queryClient = useQueryClient();
@@ -28,7 +31,8 @@ export function ResourcePage({ kind }: { kind: ResourceKind }) {
   const [editing, setEditing] = useState<ResourceRow>();
   const [deleting, setDeleting] = useState<ResourceRow>();
   const [rotating, setRotating] = useState<ResourceRow>();
-  const lookups = useAdminLookups(kind === "channels");
+  const lookupResources = kind === "channels" ? CHANNEL_LOOKUPS : kind === "teachers" ? TEACHER_LOOKUPS : NO_LOOKUPS;
+  const lookups = useAdminLookups(lookupResources.length > 0, lookupResources);
   const query = useQuery({
     queryKey: ["admin", kind, "list", page],
     queryFn: () => fetchAdminPage<ResourceRow>(config.endpoint, page, PAGE_SIZE),

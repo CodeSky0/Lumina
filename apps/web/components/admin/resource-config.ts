@@ -33,17 +33,18 @@ export const RESOURCE_CONFIGS: Record<ResourceKind, ResourceConfig> = {
       { name: "classroom_password", label: "教室密码", type: "password", requiredOnCreate: true, createOnly: true, helper: "密码需为 12–72 个字符，仅新增班级时设置。" },
       { name: "active", label: "启用班级", type: "checkbox" },
     ],
-    columns: [{ key: "name", label: "班级名称" }, { key: "grade", label: "年级" }, { key: "active", label: "状态" }],
+    columns: [{ key: "name", label: "班级名称" }, { key: "grade", label: "年级" }, { key: "classroom_username", label: "大屏账号" }, { key: "active", label: "状态" }],
   },
   teachers: {
-    title: "教师管理", singular: "教师", description: "管理教师账号、显示姓名与有效状态，密码仅在提交时传输。", endpoint: "/api/v1/admin/teachers",
+    title: "教师管理", singular: "教师", description: "维护教师账号与教授科目；每位教师固定一个科目，可分配到多个班级。", endpoint: "/api/v1/admin/teachers",
     fields: [
       { name: "username", label: "用户名", type: "text", required: true },
       { name: "display_name", label: "显示姓名", type: "text", required: true },
+      { name: "subject_id", label: "教授科目", type: "select", lookup: "subjects", requiredOnCreate: true, helper: "每位教师只教授一个科目；已有教学任务时需先停用任务才能更换。" },
       { name: "password", label: "登录密码", type: "password", requiredOnCreate: true, helper: "编辑时留空表示不修改密码。" },
       { name: "active", label: "允许登录", type: "checkbox" },
     ],
-    columns: [{ key: "display_name", label: "姓名" }, { key: "username", label: "用户名" }, { key: "active", label: "状态" }],
+    columns: [{ key: "display_name", label: "姓名" }, { key: "username", label: "用户名" }, { key: "subject_name", label: "教授科目" }, { key: "active", label: "状态" }],
   },
   subjects: {
     title: "科目管理", singular: "科目", description: "统一科目名称与大屏图标、色彩，颜色用于识别而非装饰光效。", endpoint: "/api/v1/admin/subjects",

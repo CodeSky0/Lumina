@@ -73,12 +73,15 @@ type User struct {
 	DisplayName  string    `json:"display_name" gorm:"size:100;not null"`
 	Role         Role      `json:"role" gorm:"size:20;not null"`
 	ClassID      *ID       `json:"class_id,omitempty"`
+	SubjectID    *ID       `json:"subject_id,omitempty"`
 	PasswordHash string    `json:"-" gorm:"size:100;not null"`
 	Active       bool      `json:"active" gorm:"not null;default:true"`
 	TokenVersion int64     `json:"-" gorm:"not null;default:0"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 	Class        *Class    `json:"-" gorm:"foreignKey:ClassID"`
+	Subject      *Subject  `json:"subject,omitempty" gorm:"foreignKey:SubjectID"`
+	SubjectName  string    `json:"subject_name,omitempty" gorm:"-"`
 }
 
 type Class struct {

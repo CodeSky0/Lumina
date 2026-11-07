@@ -18,15 +18,17 @@ test("管理员创建班级教师并分配任务后自动生成唯一通道", as
       active: true,
     });
     classId = classroom.id;
-    const teacher = await admin.adminWrite<{ id: string; display_name: string }>("POST", "/api/v1/admin/teachers", {
+    const subjects = await admin.adminList<{ items: Array<{ id: string; name: string }> }>("/api/v1/admin/subjects?page=1&size=1");
+    const subject = subjects.items[0];
+    const teacher = await admin.adminWrite<{ id: string; display_name: string; subject_id: string }>("POST", "/api/v1/admin/teachers", {
       username: `trainer${suffix}`,
       display_name: "验收教师",
       password: "Teacher@2026Lumina",
+      subject_id: subject.id,
       active: true,
     });
     teacherId = teacher.id;
-    const subjects = await admin.adminList<{ items: Array<{ id: string; name: string }> }>("/api/v1/admin/subjects?page=1&size=1");
-    const subject = subjects.items[0];
+    expect(teacher.subject_id).toBe(subject.id);
     const assignment = await admin.adminWrite<{ id: string }>("POST", "/api/v1/admin/assignments", {
       teacher_id: teacherId,
       class_id: classId,

@@ -79,6 +79,20 @@ docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
   -c "SELECT (SELECT count(*) FROM users) AS users, (SELECT count(*) FROM channels) AS channels, (SELECT count(*) FROM teaching_assignments) AS assignments;"
 ```
 
+迁移 000005 会建立校园组织约束。初始化后可用以下查询确认：每个班级最多一个启用大屏账号，每位教师最多一个活跃科目。
+
+```sql
+SELECT class_id, count(*) FROM users
+WHERE role = 'classroom' AND active
+GROUP BY class_id HAVING count(*) > 1;
+
+SELECT teacher_id, count(DISTINCT subject_id) FROM teaching_assignments
+WHERE active
+GROUP BY teacher_id HAVING count(DISTINCT subject_id) > 1;
+```
+
+两条查询均应返回零行。
+
 如初始化失败，先修复配置后重新执行：
 
 ```bash

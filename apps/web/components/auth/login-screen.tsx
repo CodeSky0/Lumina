@@ -60,7 +60,7 @@ export function LoginScreen() {
           <p className="mt-7 max-w-md text-copy-16 leading-8 text-neutral-7">按班级与科目组织会话，让教师少跑一次楼道，让重要通知被及时看见。</p>
         </div>
         <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border/60">
-          <div className="bg-neutral-2 p-5"><p className="y-meta text-copy-13 text-neutral-6">普通消息</p><p className="mt-2 font-medium text-neutral-9">教学任务自动建立通道</p></div>
+          <div className="bg-neutral-2 p-5"><p className="y-meta text-copy-13 text-neutral-6">教学通道</p><p className="mt-2 font-medium text-neutral-9">每位教师固定一个科目</p></div>
           <div className="bg-neutral-2 p-5"><p className="y-meta text-copy-13 text-neutral-6">紧急通知</p><p className="mt-2 font-medium text-neutral-9">教室确认后才解除提醒</p></div>
         </div>
         <div className="pointer-events-none absolute -right-24 top-1/3 h-80 w-80 rotate-12 rounded-[5rem] border border-border" aria-hidden="true" />

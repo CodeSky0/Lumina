@@ -3,13 +3,13 @@ package seed
 import "testing"
 
 func TestAssignmentIndexesCoverAllClassesWithUniqueMappings(t *testing.T) {
-	type assignmentKey struct{ teacher, class, subject int }
+	type assignmentKey struct{ teacher, class int }
 	unique := map[assignmentKey]bool{}
 	classes := map[int]bool{}
 	teacherClasses := map[int]map[int]bool{}
 	for i := 0; i < 300; i++ {
-		teacher, class, subject := assignmentIndexes(i)
-		key := assignmentKey{teacher: teacher, class: class, subject: subject}
+		teacher, class := assignmentIndexes(i)
+		key := assignmentKey{teacher: teacher, class: class}
 		if unique[key] {
 			t.Fatalf("任务唯一约束冲突: %+v", key)
 		}
@@ -26,6 +26,22 @@ func TestAssignmentIndexesCoverAllClassesWithUniqueMappings(t *testing.T) {
 	for teacher, assigned := range teacherClasses {
 		if len(assigned) != 6 {
 			t.Fatalf("教师 %d 覆盖 %d 个不同班级，期望 6", teacher, len(assigned))
+		}
+	}
+}
+
+func TestTeachersKeepOneSubjectAcrossClasses(t *testing.T) {
+	subjectsByTeacher := map[int]map[int]bool{}
+	for i := 0; i < 300; i++ {
+		teacher, _ := assignmentIndexes(i)
+		if subjectsByTeacher[teacher] == nil {
+			subjectsByTeacher[teacher] = map[int]bool{}
+		}
+		subjectsByTeacher[teacher][teacher%10] = true
+	}
+	for teacher, subjects := range subjectsByTeacher {
+		if len(subjects) != 1 {
+			t.Fatalf("教师 %d 被分配了 %d 个科目，期望 1", teacher, len(subjects))
 		}
 	}
 }

@@ -156,7 +156,7 @@ func (s *AnnouncementService) Confirm(ctx context.Context, userID, announcementI
 		return nil, apperror.Forbidden("ANNOUNCEMENT_FORBIDDEN", "无权确认该公告")
 	}
 	if announcement.Type != models.MessageUrgent {
-		return nil, apperror.BadRequest("CONFIRM_NOT_REQUIRED", "普通公告无需确认")
+		return nil, apperror.BadRequest("CONFIRM_NOT_REQUIRED", "该公告无需确认")
 	}
 	var user models.User
 	if err := s.db.WithContext(ctx).First(&user, userID).Error; err != nil {

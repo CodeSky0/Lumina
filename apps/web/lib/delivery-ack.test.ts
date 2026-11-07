@@ -54,7 +54,7 @@ describe("DeliveryAckScheduler", () => {
     const send = vi.fn().mockImplementationOnce(() => first).mockImplementationOnce(() => second);
     const scheduler = new DeliveryAckScheduler(send);
     scheduler.enqueue([message("old-1")], "old");
-    await scheduler.flush();
+    const oldFlush = scheduler.flush();
     await Promise.resolve();
     scheduler.stop("old");
 
@@ -64,5 +64,6 @@ describe("DeliveryAckScheduler", () => {
 
     expect(send).toHaveBeenCalledTimes(2);
     expect(send.mock.calls[1][0]).toEqual(["new-1"]);
+    void oldFlush;
   });
 });

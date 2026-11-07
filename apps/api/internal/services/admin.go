@@ -30,10 +30,11 @@ type ClassInput struct {
 }
 
 type TeacherInput struct {
-	Username    string `json:"username"`
-	DisplayName string `json:"display_name"`
-	Password    string `json:"password"`
-	Active      *bool  `json:"active"`
+	Username    string     `json:"username"`
+	DisplayName string     `json:"display_name"`
+	Password    string     `json:"password"`
+	SubjectID   *models.ID `json:"subject_id"`
+	Active      *bool      `json:"active"`
 }
 
 type SubjectInput struct {
@@ -105,6 +106,7 @@ func (s *AdminService) UpdateClass(ctx context.Context, id models.ID, input Clas
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&class, id).Error; err != nil {
 			return err
 		}
+		wasActive := class.Active
 		class.Name = strings.TrimSpace(input.Name)
 		class.Grade = input.Grade
 		if input.Active != nil {
@@ -115,6 +117,11 @@ func (s *AdminService) UpdateClass(ctx context.Context, id models.ID, input Clas
 		}
 		if input.Active != nil && !*input.Active {
 			if err := deactivateClassRelations(tx, id); err != nil {
+				return err
+			}
+		}
+		if input.Active != nil && *input.Active && !wasActive {
+			if err := activateClassroomAccount(tx, id); err != nil {
 				return err
 			}
 		}
@@ -157,6 +164,18 @@ func deactivateClassRelations(tx *gorm.DB, id models.ID) error {
 	return tx.Model(&models.Channel{}).Where("class_id = ? OR target_class_id = ?", id, id).Updates(map[string]any{"active": false, "updated_at": now}).Error
 }
 
+func activateClassroomAccount(tx *gorm.DB, classID models.ID) error {
+	var classroom models.User
+	err := tx.Where("class_id = ? AND role = 'classroom'", classID).Order("id ASC").First(&classroom).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return tx.Model(&classroom).Updates(map[string]any{"active": true, "updated_at": time.Now().UTC()}).Error
+}
+
 func revokeUserSessions(tx *gorm.DB, userIDs ...models.ID) error {
 	if len(userIDs) == 0 {
 		return nil
@@ -176,15 +195,22 @@ func (s *AdminService) CreateTeacher(ctx context.Context, input TeacherInput, au
 	if err != nil {
 		return nil, apperror.Internal(err)
 	}
-	teacher := &models.User{Username: strings.TrimSpace(input.Username), DisplayName: strings.TrimSpace(input.DisplayName), Role: models.RoleTeacher, PasswordHash: string(hash), Active: activeValue(input.Active)}
+	teacher := &models.User{Username: strings.TrimSpace(input.Username), DisplayName: strings.TrimSpace(input.DisplayName), Role: models.RoleTeacher, PasswordHash: string(hash), Active: activeValue(input.Active), SubjectID: input.SubjectID}
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if teacher.SubjectID != nil {
+			subject, err := loadActiveSubject(tx, *teacher.SubjectID)
+			if err != nil {
+				return err
+			}
+			teacher.SubjectID = &subject.ID
+		}
 		if err := tx.Create(teacher).Error; err != nil {
 			return writeError(err, "教师用户名已存在")
 		}
 		audit.ResourceType = "teacher"
 		audit.ResourceID = teacher.ID.String()
 		audit.Action = "teacher.create"
-		audit.Details = map[string]any{"username": teacher.Username, "display_name": teacher.DisplayName}
+		audit.Details = map[string]any{"username": teacher.Username, "display_name": teacher.DisplayName, "subject_id": optionalID(teacher.SubjectID)}
 		return recordAudit(ctx, tx, audit)
 	})
 	if err != nil {
@@ -199,7 +225,7 @@ func (s *AdminService) UpdateTeacher(ctx context.Context, id models.ID, input Te
 	}
 	var teacher models.User
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("id = ? AND role = 'teacher'", id).First(&teacher).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND role = 'teacher'", id).First(&teacher).Error; err != nil {
 			return err
 		}
 		teacher.DisplayName = strings.TrimSpace(input.DisplayName)
@@ -215,6 +241,34 @@ func (s *AdminService) UpdateTeacher(ctx context.Context, id models.ID, input Te
 				return err
 			}
 			teacher.PasswordHash = string(hash)
+		}
+		if input.SubjectID != nil {
+			subjectID := *input.SubjectID
+			if subjectID == 0 {
+				hasAssignments, err := teacherHasActiveAssignments(tx, id)
+				if err != nil {
+					return err
+				}
+				if hasAssignments {
+					return apperror.Conflict("TEACHER_SUBJECT_LOCKED", "教师已有教学任务，请先停用或删除任务后再清空科目")
+				}
+				teacher.SubjectID = nil
+			} else {
+				subject, err := loadActiveSubject(tx, subjectID)
+				if err != nil {
+					return err
+				}
+				if teacher.SubjectID == nil || *teacher.SubjectID != subjectID {
+					hasAssignments, err := teacherHasActiveAssignments(tx, id)
+					if err != nil {
+						return err
+					}
+					if hasAssignments {
+						return apperror.Conflict("TEACHER_SUBJECT_LOCKED", "教师已有教学任务，请先停用或删除任务后再更换科目")
+					}
+				}
+				teacher.SubjectID = &subject.ID
+			}
 		}
 		if err := tx.Save(&teacher).Error; err != nil {
 			return err
@@ -232,7 +286,7 @@ func (s *AdminService) UpdateTeacher(ctx context.Context, id models.ID, input Te
 		audit.ResourceType = "teacher"
 		audit.ResourceID = id.String()
 		audit.Action = "teacher.update"
-		audit.Details = map[string]any{"display_name": teacher.DisplayName, "active": teacher.Active, "password_changed": input.Password != ""}
+		audit.Details = map[string]any{"display_name": teacher.DisplayName, "active": teacher.Active, "subject_id": optionalID(teacher.SubjectID), "password_changed": input.Password != ""}
 		return recordAudit(ctx, tx, audit)
 	})
 	if err != nil {
@@ -304,6 +358,11 @@ func (s *AdminService) UpdateSubject(ctx context.Context, id models.ID, input Su
 		if err := tx.Save(&subject).Error; err != nil {
 			return writeError(err, "科目名称已存在")
 		}
+		if input.Active != nil && !*input.Active {
+			if err := deactivateSubjectRelations(tx, id); err != nil {
+				return err
+			}
+		}
 		audit.ResourceType = "subject"
 		audit.ResourceID = id.String()
 		audit.Action = "subject.update"
@@ -321,8 +380,19 @@ func (s *AdminService) DeleteSubject(ctx context.Context, id models.ID, audit Au
 		if err := tx.Model(&models.Subject{}).Where("id = ?", id).Updates(map[string]any{"active": false, "updated_at": time.Now().UTC()}).Error; err != nil {
 			return err
 		}
-		return tx.Model(&models.TeachingAssignment{}).Where("subject_id = ?", id).Updates(map[string]any{"active": false, "updated_at": time.Now().UTC()}).Error
+		return deactivateSubjectRelations(tx, id)
 	})
+}
+
+func deactivateSubjectRelations(tx *gorm.DB, id models.ID) error {
+	now := time.Now().UTC()
+	if err := tx.Model(&models.TeachingAssignment{}).Where("subject_id = ?", id).Updates(map[string]any{"active": false, "updated_at": now}).Error; err != nil {
+		return err
+	}
+	if err := tx.Model(&models.Channel{}).Where("subject_id = ?", id).Updates(map[string]any{"active": false, "updated_at": now}).Error; err != nil {
+		return err
+	}
+	return tx.Model(&models.User{}).Where("role = 'teacher' AND subject_id = ?", id).Updates(map[string]any{"subject_id": nil, "updated_at": now}).Error
 }
 
 func validColor(value string) bool {
@@ -338,17 +408,18 @@ func validColor(value string) bool {
 }
 
 func (s *AdminService) CreateAssignment(ctx context.Context, input AssignmentInput, audit AuditEntry) (*models.TeachingAssignment, error) {
-	assignment := &models.TeachingAssignment{TeacherID: input.TeacherID, ClassID: input.ClassID, SubjectID: input.SubjectID, Active: activeValue(input.Active)}
-	if input.TeacherID == 0 || input.ClassID == 0 || input.SubjectID == 0 {
-		return nil, apperror.BadRequest("VALIDATION_ERROR", "教学任务关联标识不能为空")
+	if input.TeacherID == 0 || input.ClassID == 0 {
+		return nil, apperror.BadRequest("VALIDATION_ERROR", "教学任务必须指定教师和班级")
 	}
+	assignment := &models.TeachingAssignment{TeacherID: input.TeacherID, ClassID: input.ClassID, Active: activeValue(input.Active)}
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		teacher, class, subject, err := activeAssignmentRefs(tx, input.TeacherID, input.ClassID, input.SubjectID)
+		teacher, class, subject, err := resolveAssignmentRefs(tx, input.TeacherID, input.ClassID, input.SubjectID)
 		if err != nil {
 			return err
 		}
+		assignment.SubjectID = subject.ID
 		if err := tx.Create(assignment).Error; err != nil {
-			return writeError(err, "教学任务已存在")
+			return writeError(err, "该教师在本班的教学任务已存在")
 		}
 		channel := models.Channel{Name: class.Name + " · " + subject.Name + " · " + teacher.DisplayName, Type: models.ChannelNormal, ClassID: &assignment.ClassID, SubjectID: &assignment.SubjectID, TeacherID: &assignment.TeacherID, Active: assignment.Active}
 		if err := tx.Create(&channel).Error; err != nil {
@@ -357,7 +428,7 @@ func (s *AdminService) CreateAssignment(ctx context.Context, input AssignmentInp
 		audit.ResourceType = "assignment"
 		audit.ResourceID = assignment.ID.String()
 		audit.Action = "assignment.create"
-		audit.Details = map[string]any{"channel_id": channel.ID.String(), "teacher_id": input.TeacherID.String(), "class_id": input.ClassID.String(), "subject_id": input.SubjectID.String()}
+		audit.Details = map[string]any{"channel_id": channel.ID.String(), "teacher_id": assignment.TeacherID.String(), "class_id": assignment.ClassID.String(), "subject_id": assignment.SubjectID.String()}
 		return recordAudit(ctx, tx, audit)
 	})
 	if err != nil {
@@ -367,13 +438,16 @@ func (s *AdminService) CreateAssignment(ctx context.Context, input AssignmentInp
 }
 
 func (s *AdminService) UpdateAssignment(ctx context.Context, id models.ID, input AssignmentInput, audit AuditEntry) (*models.TeachingAssignment, error) {
+	if input.TeacherID == 0 || input.ClassID == 0 {
+		return nil, apperror.BadRequest("VALIDATION_ERROR", "教学任务必须指定教师和班级")
+	}
 	var assignment models.TeachingAssignment
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&assignment, id).Error; err != nil {
 			return err
 		}
 		oldTeacherID, oldClassID, oldSubjectID := assignment.TeacherID, assignment.ClassID, assignment.SubjectID
-		teacher, class, subject, err := activeAssignmentRefs(tx, input.TeacherID, input.ClassID, input.SubjectID)
+		teacher, class, subject, err := resolveAssignmentRefs(tx, input.TeacherID, input.ClassID, input.SubjectID)
 		if err != nil {
 			return err
 		}
@@ -383,12 +457,12 @@ func (s *AdminService) UpdateAssignment(ctx context.Context, id models.ID, input
 		}
 		assignment.TeacherID = input.TeacherID
 		assignment.ClassID = input.ClassID
-		assignment.SubjectID = input.SubjectID
+		assignment.SubjectID = subject.ID
 		if input.Active != nil {
 			assignment.Active = *input.Active
 		}
 		if err := tx.Save(&assignment).Error; err != nil {
-			return writeError(err, "教学任务已存在")
+			return writeError(err, "该教师在本班的教学任务已存在")
 		}
 		channel.ClassID = &assignment.ClassID
 		channel.SubjectID = &assignment.SubjectID
@@ -401,7 +475,7 @@ func (s *AdminService) UpdateAssignment(ctx context.Context, id models.ID, input
 		audit.ResourceType = "assignment"
 		audit.ResourceID = id.String()
 		audit.Action = "assignment.update"
-		audit.Details = map[string]any{"teacher_id": input.TeacherID.String(), "class_id": input.ClassID.String(), "subject_id": input.SubjectID.String()}
+		audit.Details = map[string]any{"teacher_id": assignment.TeacherID.String(), "class_id": assignment.ClassID.String(), "subject_id": assignment.SubjectID.String()}
 		return recordAudit(ctx, tx, audit)
 	})
 	if err != nil {
@@ -423,20 +497,67 @@ func (s *AdminService) DeleteAssignment(ctx context.Context, id models.ID, audit
 	})
 }
 
-func activeAssignmentRefs(tx *gorm.DB, teacherID, classID, subjectID models.ID) (*models.User, *models.Class, *models.Subject, error) {
+func resolveAssignmentRefs(tx *gorm.DB, teacherID, classID, subjectID models.ID) (*models.User, *models.Class, *models.Subject, error) {
 	var teacher models.User
 	var class models.Class
-	var subject models.Subject
-	if err := tx.Where("id = ? AND role = 'teacher' AND active = true", teacherID).First(&teacher).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND role = 'teacher' AND active = true", teacherID).First(&teacher).Error; err != nil {
 		return nil, nil, nil, apperror.BadRequest("ASSIGNMENT_INACTIVE", "教师不存在或已停用")
 	}
 	if err := tx.Where("id = ? AND active = true", classID).First(&class).Error; err != nil {
 		return nil, nil, nil, apperror.BadRequest("ASSIGNMENT_INACTIVE", "班级不存在或已停用")
 	}
-	if err := tx.Where("id = ? AND active = true", subjectID).First(&subject).Error; err != nil {
-		return nil, nil, nil, apperror.BadRequest("ASSIGNMENT_INACTIVE", "科目不存在或已停用")
+	if subjectID == 0 {
+		if teacher.SubjectID == nil {
+			return nil, nil, nil, apperror.BadRequest("TEACHER_SUBJECT_REQUIRED", "请先在教师管理中为教师设置教授科目")
+		}
+		subjectID = *teacher.SubjectID
+	} else if teacher.SubjectID != nil && *teacher.SubjectID != subjectID {
+		return nil, nil, nil, apperror.Conflict("TEACHER_SUBJECT_LOCKED", "每位教师只教授一个科目，请为教师更换科目或选择相同科目的任务")
 	}
-	return &teacher, &class, &subject, nil
+	var conflicting int64
+	if err := tx.Model(&models.TeachingAssignment{}).Where("teacher_id = ? AND active = true AND subject_id <> ?", teacherID, subjectID).Count(&conflicting).Error; err != nil {
+		return nil, nil, nil, err
+	}
+	if conflicting > 0 {
+		return nil, nil, nil, apperror.Conflict("TEACHER_SUBJECT_LOCKED", "该教师已有其他科目的教学任务，需先停用后再分配")
+	}
+	subject, err := loadActiveSubject(tx, subjectID)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if teacher.SubjectID == nil {
+		teacher.SubjectID = &subject.ID
+		if err := tx.Model(&teacher).Updates(map[string]any{"subject_id": subject.ID, "updated_at": time.Now().UTC()}).Error; err != nil {
+			return nil, nil, nil, err
+		}
+	}
+	return &teacher, &class, subject, nil
+}
+
+func loadActiveSubject(tx *gorm.DB, subjectID models.ID) (*models.Subject, error) {
+	if subjectID == 0 {
+		return nil, apperror.BadRequest("SUBJECT_REQUIRED", "科目不能为空")
+	}
+	var subject models.Subject
+	if err := tx.Where("id = ? AND active = true", subjectID).First(&subject).Error; err != nil {
+		return nil, apperror.BadRequest("SUBJECT_INACTIVE", "科目不存在或已停用")
+	}
+	return &subject, nil
+}
+
+func teacherHasActiveAssignments(tx *gorm.DB, teacherID models.ID) (bool, error) {
+	var count int64
+	if err := tx.Model(&models.TeachingAssignment{}).Where("teacher_id = ? AND active = true", teacherID).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func optionalID(id *models.ID) any {
+	if id == nil {
+		return nil
+	}
+	return id.String()
 }
 
 func (s *AdminService) CreateBroadcastChannel(ctx context.Context, input BroadcastChannelInput, audit AuditEntry) (*models.Channel, error) {
@@ -512,15 +633,67 @@ func validateBroadcast(input BroadcastChannelInput) error {
 	return nil
 }
 
-func (s *AdminService) ListClasses(ctx context.Context, page, size int) ([]models.Class, int64, error) {
-	var items []models.Class
-	total, err := listPaged(s.db.WithContext(ctx), &items, page, size, "name", "")
-	return items, total, err
+type ClassDTO struct {
+	models.Class
+	ClassroomUserID   *models.ID `json:"classroom_user_id,omitempty"`
+	ClassroomUsername string     `json:"classroom_username,omitempty"`
+}
+
+func (s *AdminService) ListClasses(ctx context.Context, page, size int) ([]ClassDTO, int64, error) {
+	page, size = normalizePage(page, size)
+	var total int64
+	if err := s.db.WithContext(ctx).Model(&models.Class{}).Count(&total).Error; err != nil {
+		return nil, 0, apperror.Internal(err)
+	}
+	var classes []models.Class
+	if err := s.db.WithContext(ctx).Model(&models.Class{}).Order("name").Offset((page - 1) * size).Limit(size).Find(&classes).Error; err != nil {
+		return nil, 0, apperror.Internal(err)
+	}
+	result := make([]ClassDTO, len(classes))
+	for i := range classes {
+		result[i].Class = classes[i]
+	}
+	if len(classes) == 0 {
+		return result, total, nil
+	}
+	classIDs := make([]models.ID, len(classes))
+	for i := range classes {
+		classIDs[i] = classes[i].ID
+	}
+	var classrooms []models.User
+	if err := s.db.WithContext(ctx).Where("role = 'classroom' AND class_id IN ?", classIDs).Order("id ASC").Find(&classrooms).Error; err != nil {
+		return nil, 0, apperror.Internal(err)
+	}
+	byClass := make(map[models.ID]models.User, len(classrooms))
+	for _, classroom := range classrooms {
+		if classroom.ClassID == nil {
+			continue
+		}
+		if _, exists := byClass[*classroom.ClassID]; !exists {
+			byClass[*classroom.ClassID] = classroom
+		}
+	}
+	for i := range result {
+		if classroom, ok := byClass[result[i].ID]; ok {
+			id := classroom.ID
+			result[i].ClassroomUserID = &id
+			result[i].ClassroomUsername = classroom.Username
+		}
+	}
+	return result, total, nil
 }
 func (s *AdminService) ListTeachers(ctx context.Context, page, size int) ([]models.User, int64, error) {
 	var items []models.User
-	total, err := listPaged(s.db.WithContext(ctx).Where("role = 'teacher'"), &items, page, size, "display_name", "")
-	return items, total, err
+	total, err := listPaged(s.db.WithContext(ctx).Preload("Subject").Where("role = 'teacher'"), &items, page, size, "display_name", "")
+	if err != nil {
+		return nil, 0, err
+	}
+	for i := range items {
+		if items[i].Subject != nil {
+			items[i].SubjectName = items[i].Subject.Name
+		}
+	}
+	return items, total, nil
 }
 func (s *AdminService) ListSubjects(ctx context.Context, page, size int) ([]models.Subject, int64, error) {
 	var items []models.Subject

@@ -70,7 +70,8 @@ describe("消息增量同步", () => {
     await syncChannelMessages(client, "ch-1");
     await deliveryAckScheduler.flush();
 
-    expect(apiFetch).toHaveBeenCalledWith("/api/v1/messages/delivery-ack", { method: "POST", body: { message_ids: ["12"] } });
+    const ackCall = vi.mocked(apiFetch).mock.calls.find(([path]) => path === "/api/v1/messages/delivery-ack");
+    expect(ackCall?.[1]).toMatchObject({ method: "POST", body: { message_ids: ["12"] } });
   });
 
   it("cleanup 后旧同步晚完成不写缓存、不标同步也不恢复新账号 ACK 队列", async () => {

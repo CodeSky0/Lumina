@@ -13,6 +13,8 @@ export interface AdminClass {
 
 export interface TeacherAccount extends User {
   active?: boolean;
+  subject_id?: string;
+  subject_name?: string;
   created_at?: string;
   [key: string]: unknown;
 }

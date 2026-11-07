@@ -29,5 +29,5 @@ func main() {
 	if err != nil {
 		log.Fatalf("种子执行失败: %v", err)
 	}
-	log.Printf("种子完成: 管理员=%d 班级=%d 教室用户=%d 教师=%d 科目=%d 教学任务=%d 普通通道=%d 公告=%d", stats.Admins, stats.Classes, stats.Classrooms, stats.Teachers, stats.Subjects, stats.Assignments, stats.Channels, stats.Announcements)
+	log.Printf("种子完成: 管理员=%d 班级=%d 教室用户=%d 教师=%d 科目=%d 教学任务=%d 教学通道=%d 公告=%d", stats.Admins, stats.Classes, stats.Classrooms, stats.Teachers, stats.Subjects, stats.Assignments, stats.Channels, stats.Announcements)
 }

@@ -35,7 +35,7 @@ function ClassroomWorkspace() {
         </div>
       </header>
       <main id="main-content" className="mx-auto max-w-[1800px] space-y-8 px-5 py-7 sm:px-8 sm:py-9">
-        <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="y-meta text-copy-13 text-accent">{formatFullDate()}</p><h1 className="mt-2 text-title-28 font-medium tracking-tight text-neutral-10 sm:text-display-36">今天的课堂消息</h1><p className="mt-3 max-w-xl text-copy-16 leading-7 text-neutral-7">选择科目卡片，查看教师发送的消息与资料。</p></div><p className="y-meta text-label-12 text-neutral-6">{channelsQuery.data?.length ?? 0} 个可用通道</p></section>
+        <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="y-meta text-copy-13 text-accent">{formatFullDate()}</p><h1 className="mt-2 text-title-28 font-medium tracking-tight text-neutral-10 sm:text-display-36">今天的课堂提醒</h1><p className="mt-3 max-w-xl text-copy-16 leading-7 text-neutral-7">选择科目卡片查看教师消息；紧急通知需要本班确认后才能关闭。</p></div><p className="y-meta text-label-12 text-neutral-6">{channelsQuery.data?.length ?? 0} 个可用通道</p></section>
         <AnnouncementBar />
         <section aria-labelledby="channels-title"><h2 id="channels-title" className="sr-only">科目消息通道</h2>
           {channelsQuery.isPending ? <ListSkeleton rows={4} /> : channelsQuery.isError ? <ErrorState error={channelsQuery.error} onRetry={() => void channelsQuery.refetch()} /> : channelsQuery.data.length === 0 ? <EmptyState icon={<ChatsCircle className="h-7 w-7" />} title="暂无科目通道" description="管理员分配教学任务后，本科的科目卡片会显示在这里。" /> : (
