@@ -50,55 +50,55 @@ export function LoginScreen() {
   }
 
   return (
-    <main id="main-content" className="grid min-h-[100dvh] bg-white lg:grid-cols-[1.08fr_.92fr]">
-      <section className="relative hidden overflow-hidden bg-sidebar p-12 text-white lg:flex lg:flex-col lg:justify-between xl:p-16">
-        <Brand dark />
+    <main id="main-content" className="grid min-h-[100dvh] bg-paper lg:grid-cols-[1.08fr_.92fr]">
+      <section className="relative hidden overflow-hidden border-r border-border bg-neutral-2 p-12 lg:flex lg:flex-col lg:justify-between xl:p-16">
+        <Brand />
         <div className="relative max-w-xl">
-          <div className="absolute -left-16 top-0 h-px w-10 bg-indigo-500" aria-hidden="true" />
-          <p className="mb-5 text-xs font-semibold uppercase tracking-[0.24em] text-indigo-300">校园沟通，从找到彼此开始</p>
-          <h1 className="text-5xl font-medium leading-[1.12] tracking-[-0.04em] xl:text-6xl">让每一条消息，<br /><span className="text-zinc-400">抵达正确的教室。</span></h1>
-          <p className="mt-7 max-w-md text-base leading-8 text-zinc-400">按班级与科目组织会话，让教师少跑一次楼道，让重要通知被及时看见。</p>
+          <div className="absolute -left-14 top-3 h-px w-10 bg-accent" aria-hidden="true" />
+          <p className="y-meta mb-5 text-label-12 uppercase tracking-[0.24em] text-neutral-6">校园沟通，从找到彼此开始</p>
+          <h1 className="text-display-36 font-medium leading-[1.12] tracking-[-0.02em] text-neutral-10 xl:text-display-48">让每一条消息，<br /><span className="text-neutral-6">抵达正确的教室。</span></h1>
+          <p className="mt-7 max-w-md text-copy-16 leading-8 text-neutral-7">按班级与科目组织会话，让教师少跑一次楼道，让重要通知被及时看见。</p>
         </div>
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10">
-          <div className="bg-sidebar p-5"><p className="text-sm text-zinc-400">普通消息</p><p className="mt-2 font-medium">教学任务自动建立通道</p></div>
-          <div className="bg-sidebar p-5"><p className="text-sm text-zinc-400">紧急通知</p><p className="mt-2 font-medium">教室确认后才解除提醒</p></div>
+        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border/60">
+          <div className="bg-neutral-2 p-5"><p className="y-meta text-copy-13 text-neutral-6">普通消息</p><p className="mt-2 font-medium text-neutral-9">教学任务自动建立通道</p></div>
+          <div className="bg-neutral-2 p-5"><p className="y-meta text-copy-13 text-neutral-6">紧急通知</p><p className="mt-2 font-medium text-neutral-9">教室确认后才解除提醒</p></div>
         </div>
-        <div className="pointer-events-none absolute -right-24 top-1/3 h-80 w-80 rotate-12 rounded-[5rem] border border-white/[0.06]" aria-hidden="true" />
+        <div className="pointer-events-none absolute -right-24 top-1/3 h-80 w-80 rotate-12 rounded-[5rem] border border-border" aria-hidden="true" />
       </section>
 
-      <section className="flex min-h-[100dvh] flex-col px-6 py-7 sm:px-12 lg:px-16 xl:px-24">
+      <section className="flex min-h-[100dvh] flex-col bg-paper px-6 py-7 sm:px-12 lg:px-16 xl:px-24">
         <div className="lg:hidden"><Brand /></div>
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-12">
           {status === "restoring" ? (
-            <div className="flex items-center gap-3 text-sm text-zinc-500" role="status"><CircleNotch className="h-5 w-5 animate-spin text-indigo-500" />正在安全恢复会话</div>
+            <div className="flex items-center gap-3 text-copy-14 text-neutral-7" role="status"><CircleNotch className="h-5 w-5 animate-spin text-accent" />正在安全恢复会话</div>
           ) : (
             <>
               <div className="mb-8">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">统一身份入口</p>
-                <h2 className="text-3xl font-semibold tracking-tight text-zinc-950">欢迎回来</h2>
-                <p className="mt-3 text-sm leading-6 text-zinc-500">使用校园账号登录，教室设备可切换绑定码登录。</p>
+                <p className="mb-3 text-label-12 font-medium uppercase tracking-[1.5px] text-neutral-6">统一身份入口</p>
+                <h2 className="text-title-28 font-medium tracking-tight text-neutral-10">欢迎回来</h2>
+                <p className="mt-3 text-copy-14 leading-6 text-neutral-7">使用校园账号登录，教室设备可切换绑定码登录。</p>
               </div>
-              <div className="mb-7 grid grid-cols-2 rounded-xl bg-zinc-100 p-1" role="tablist" aria-label="登录方式">
-                <button role="tab" aria-selected={mode === "account"} onClick={() => switchMode("account")} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-lg text-sm font-medium transition", mode === "account" ? "bg-white text-zinc-900 shadow-xs" : "text-zinc-500 hover:text-zinc-800")}><UserIcon className="h-4 w-4" />账号登录</button>
-                <button role="tab" aria-selected={mode === "device"} onClick={() => switchMode("device")} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-lg text-sm font-medium transition", mode === "device" ? "bg-white text-zinc-900 shadow-xs" : "text-zinc-500 hover:text-zinc-800")}><DeviceMobile className="h-4 w-4" />设备登录</button>
+              <div className="mb-7 grid grid-cols-2 rounded-md bg-neutral-2 p-1" role="tablist" aria-label="登录方式">
+                <button role="tab" aria-selected={mode === "account"} onClick={() => switchMode("account")} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-md text-copy-14 font-medium transition", mode === "account" ? "bg-paper text-neutral-10 ring-1 ring-border" : "text-neutral-7 hover:text-neutral-10")}><UserIcon className="h-4 w-4" />账号登录</button>
+                <button role="tab" aria-selected={mode === "device"} onClick={() => switchMode("device")} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-md text-copy-14 font-medium transition", mode === "device" ? "bg-paper text-neutral-10 ring-1 ring-border" : "text-neutral-7 hover:text-neutral-10")}><DeviceMobile className="h-4 w-4" />设备登录</button>
               </div>
               <form className="space-y-5" onSubmit={submit}>
                 {mode === "account" ? (
                   <>
-                    <div className="space-y-2"><Label htmlFor="username">用户名</Label><div className="relative"><UserIcon className="pointer-events-none absolute left-3.5 top-3.5 h-4 w-4 text-zinc-400" /><Input id="username" className="pl-10" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required maxLength={80} placeholder="请输入校园账号" /></div></div>
-                    <div className="space-y-2"><Label htmlFor="password">密码</Label><div className="relative"><LockKey className="pointer-events-none absolute left-3.5 top-3.5 h-4 w-4 text-zinc-400" /><Input id="password" className="px-10" type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required maxLength={128} placeholder="请输入密码" /><button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-1 top-1 flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-50 hover:text-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500" aria-label={showPassword ? "隐藏密码" : "显示密码"}>{showPassword ? <EyeSlash className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div></div>
+                    <div className="space-y-2"><Label htmlFor="username">用户名</Label><div className="relative"><UserIcon className="pointer-events-none absolute left-3.5 top-3.5 h-4 w-4 text-neutral-6" /><Input id="username" className="pl-10" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required maxLength={80} placeholder="请输入校园账号" /></div></div>
+                    <div className="space-y-2"><Label htmlFor="password">密码</Label><div className="relative"><LockKey className="pointer-events-none absolute left-3.5 top-3.5 h-4 w-4 text-neutral-6" /><Input id="password" className="px-10" type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required maxLength={128} placeholder="请输入密码" /><button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-1 top-1 flex h-9 w-9 items-center justify-center rounded-md text-neutral-6 hover:bg-neutral-2 hover:text-neutral-9 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" aria-label={showPassword ? "隐藏密码" : "显示密码"}>{showPassword ? <EyeSlash className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div></div>
                   </>
                 ) : (
-                  <div className="space-y-2"><Label htmlFor="device-code">设备绑定码</Label><Input id="device-code" type="password" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} required maxLength={256} placeholder="请输入管理员提供的绑定码" /><p className="text-xs leading-5 text-zinc-500">绑定码由学校管理员管理，兑换后仅保存安全会话。</p></div>
+                  <div className="space-y-2"><Label htmlFor="device-code">设备绑定码</Label><Input id="device-code" type="password" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} required maxLength={256} placeholder="请输入管理员提供的绑定码" /><p className="text-label-12 leading-5 text-neutral-6">绑定码由学校管理员管理，兑换后仅保存安全会话。</p></div>
                 )}
                 <InlineError error={error} />
                 <Button type="submit" size="lg" className="w-full" isLoading={isPending} disabled={mode === "account" ? !username.trim() || !password : !code.trim()}>{isPending ? "正在验证身份" : "进入工作区"}<ArrowRight className="h-4 w-4" /></Button>
               </form>
-              <p className="mt-6 text-xs leading-5 text-zinc-400">连续登录失败可能触发临时锁定。若无法登录，请联系学校管理员。</p>
+              <p className="mt-6 text-label-12 leading-5 text-neutral-6">连续登录失败可能触发临时锁定。若无法登录，请联系学校管理员。</p>
             </>
           )}
         </div>
-        <p className="text-center text-xs text-zinc-400 lg:text-left">Lumina · 校园内部通讯系统</p>
+        <p className="y-meta text-center text-label-12 text-neutral-6 lg:text-left">Lumina · 校园内部通讯系统</p>
       </section>
     </main>
   );

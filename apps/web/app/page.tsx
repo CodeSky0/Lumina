@@ -14,5 +14,5 @@ export default function HomePage() {
     if (status === "anonymous") router.replace("/login");
     if (status === "authenticated" && user) router.replace(destinationForRole(user.role));
   }, [router, status, user]);
-  return <main id="main-content" className="flex min-h-[100dvh] items-center justify-center" role="status"><CircleNotch className="h-6 w-6 animate-spin text-indigo-500" /><span className="ml-3 text-sm text-zinc-500">正在进入 Lumina</span></main>;
+  return <main id="main-content" className="flex min-h-[100dvh] items-center justify-center" role="status"><CircleNotch className="h-6 w-6 animate-spin text-accent" /><span className="ml-3 text-copy-14 text-neutral-7">正在进入 Lumina</span></main>;
 }

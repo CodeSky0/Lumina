@@ -6,22 +6,22 @@ import { CircleNotch } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold outline-hidden transition duration-200 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-md px-4 text-copy-14 font-medium outline-hidden transition duration-200 focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        primary: "bg-indigo-500 text-white hover:bg-indigo-600",
-        secondary: "border border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50",
-        ghost: "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950",
-        danger: "bg-red-600 text-white hover:bg-red-700",
-        warning: "bg-amber-500 text-zinc-950 hover:bg-amber-400",
-        dark: "border border-white/10 bg-white/[0.06] text-zinc-100 hover:bg-white/10",
+        primary: "bg-accent text-on-accent hover:bg-accent/90",
+        secondary: "bg-neutral-2 text-neutral-9 ring-1 ring-border hover:bg-neutral-3",
+        ghost: "text-neutral-7 hover:bg-neutral-2 hover:text-neutral-10",
+        danger: "bg-error text-on-error hover:bg-error/90",
+        warning: "bg-warning text-on-warning hover:bg-warning/90",
+        dark: "bg-neutral-2 text-neutral-9 ring-1 ring-border hover:bg-neutral-3",
       },
       size: {
         default: "min-h-10",
-        sm: "min-h-9 rounded-lg px-3 text-xs",
-        lg: "min-h-12 px-5 text-base",
-        touch: "min-h-14 rounded-2xl px-6 text-lg",
+        sm: "min-h-9 rounded-md px-3 text-label-12",
+        lg: "min-h-12 px-5 text-copy-15",
+        touch: "min-h-14 rounded-lg px-6 text-copy-16",
         icon: "h-10 w-10 min-h-10 px-0",
         touchIcon: "h-12 w-12 min-h-12 px-0",
       },

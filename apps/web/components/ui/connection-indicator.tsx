@@ -15,8 +15,8 @@ const labels = {
 export function ConnectionIndicator({ dark = false }: { dark?: boolean }) {
   const status = useRealtimeStore((state) => state.status);
   return (
-    <div className={cn("flex items-center gap-2 text-xs", dark ? "text-zinc-400" : "text-zinc-500")} role="status" aria-live="polite">
-      <span className={cn("h-2 w-2 rounded-full", status === "connected" ? "bg-emerald-500" : status === "idle" ? "bg-zinc-400" : "animate-pulseSoft bg-amber-500")} aria-hidden="true" />
+    <div className={cn("flex items-center gap-2 text-label-12", dark ? "text-neutral-6" : "text-neutral-7")} role="status" aria-live="polite">
+      <span className={cn("h-2 w-2 rounded-full", status === "connected" ? "bg-success" : status === "idle" ? "bg-neutral-5" : "animate-pulseSoft bg-warning")} aria-hidden="true" />
       {labels[status]}
     </div>
   );

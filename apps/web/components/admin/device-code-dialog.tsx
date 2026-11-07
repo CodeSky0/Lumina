@@ -51,9 +51,9 @@ export function DeviceCodeDialog({ open, record, onClose }: { open: boolean; rec
 
   return <Dialog open={open} title={`轮换${String(record?.name ?? "班级")}设备码`} description={result?.notice ?? "轮换后旧设备码立即失效。新设备码仅在本次对话框中显示，不会写入浏览器持久化存储。"} onClose={mutation.isPending ? undefined : close}>
     {result ? <div className="space-y-5">
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-        <p className="text-sm font-medium text-emerald-800">请立即复制并安全保存</p>
-        <code className="mt-3 block select-all break-all rounded-xl bg-white px-4 py-3 text-center font-mono text-xl tracking-wider text-zinc-950">{result.code}</code>
+      <div className="rounded-lg border border-success/25 bg-success/10 p-5">
+        <p className="text-copy-14 font-medium text-success">请立即复制并安全保存</p>
+        <code className="mt-3 block select-all break-all rounded-md bg-paper px-4 py-3 text-center font-mono text-title-20 tracking-wider text-neutral-10">{result.code}</code>
       </div>
       {copyError && <InlineError error={copyError} />}
       <div className="flex justify-end gap-3"><Button variant="secondary" onClick={close}>关闭</Button><Button onClick={() => void copyCode()}>{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}{copied ? "已复制" : "复制设备码"}</Button></div>

@@ -22,9 +22,9 @@ export function AuthGuard({ role, children }: { role: Role; children: ReactNode 
 
   if (!allowed) {
     return (
-      <main id="main-content" className="flex min-h-[100dvh] items-center justify-center bg-zinc-50" role="status">
-        <div className="flex flex-col items-center gap-3 text-sm text-zinc-500">
-          <CircleNotch className="h-6 w-6 animate-spin text-indigo-500" aria-hidden="true" />
+      <main id="main-content" className="flex min-h-[100dvh] items-center justify-center bg-paper" role="status">
+        <div className="flex flex-col items-center gap-3 text-copy-14 text-neutral-7">
+          <CircleNotch className="h-6 w-6 animate-spin text-accent" aria-hidden="true" />
           {status === "restoring" ? "正在安全恢复会话" : "正在前往可用工作区"}
         </div>
       </main>

@@ -89,49 +89,49 @@ export function MessageItem({ message, currentUserId, replyTarget, large = false
   }
 
   if (message.type === "system") {
-    return <article ref={articleRef} className="flex justify-center py-2"><p className={cn("rounded-full bg-zinc-100 px-4 py-2 text-center text-zinc-500", large ? "text-lg" : "text-xs")}>{message.content}</p></article>;
+    return <article ref={articleRef} className="flex justify-center py-2"><p className={cn("rounded-full bg-neutral-2 px-4 py-2 text-center text-neutral-7", large ? "text-copy-16" : "text-label-12")}>{message.content}</p></article>;
   }
 
   const urgent = message.type === "urgent";
   const notice = message.type === "notice";
   return (
     <article ref={articleRef} className={cn("group flex gap-3 px-1 py-3", own && "flex-row-reverse")} aria-label={`${message.sender_name}发送的消息`}>
-      <div className={cn("flex h-9 w-9 shrink-0 select-none items-center justify-center rounded-xl text-xs font-semibold", own ? "bg-indigo-100 text-indigo-700" : "bg-zinc-200 text-zinc-600", large && "h-12 w-12 text-base")} aria-hidden="true">{message.sender_name.slice(0, 1)}</div>
+      <div className={cn("flex h-9 w-9 shrink-0 select-none items-center justify-center rounded-md text-label-12 font-medium", own ? "bg-accent/10 text-accent" : "bg-neutral-3 text-neutral-7", large && "h-12 w-12 text-copy-14")} aria-hidden="true">{message.sender_name.slice(0, 1)}</div>
       <div className={cn("min-w-0 max-w-[82%] sm:max-w-[72%]", own && "flex flex-col items-end")}>
-        <div className={cn("mb-1.5 flex items-center gap-2 text-xs text-zinc-400", own && "flex-row-reverse", large && "text-base")}><span className="font-medium text-zinc-600">{message.sender_name}</span><time dateTime={message.created_at}>{formatDateTime(message.created_at)}</time></div>
+        <div className={cn("mb-1.5 flex items-center gap-2 text-label-12 text-neutral-6", own && "flex-row-reverse", large && "text-copy-14")}><span className="font-medium text-neutral-7">{message.sender_name}</span><time className="y-meta" dateTime={message.created_at}>{formatDateTime(message.created_at)}</time></div>
         <div className={cn(
-          "rounded-2xl border px-4 py-3",
-          own ? "rounded-tr-md border-indigo-500 bg-indigo-500 text-white" : "rounded-tl-md border-zinc-200 bg-white text-zinc-800",
-          notice && "border-amber-300 bg-amber-50 text-amber-950",
-          urgent && "border-red-300 bg-red-50 text-red-950",
-          failed && "border-red-300 bg-zinc-100 text-zinc-500",
-          large && "px-5 py-4 text-lg leading-8",
+          "rounded-lg border px-4 py-3",
+          own ? "rounded-tr-md border-accent/20 bg-accent/8 text-neutral-9" : "rounded-tl-md border-border bg-neutral-2 text-neutral-9",
+          notice && "border-warning/25 bg-warning/8 text-neutral-9",
+          urgent && "border-error/25 bg-error/8 text-neutral-9",
+          failed && "border-error/30 bg-neutral-2 text-neutral-7",
+          large && "px-5 py-4 text-copy-16 leading-8",
         )}>
           {(notice || urgent) && <Badge tone={urgent ? "red" : "yellow"} className="mb-2">{urgent ? "紧急通知" : "普通通知"}</Badge>}
-          {message.reply_to_id && <div className={cn("mb-2 border-l-2 pl-2 text-xs opacity-75", own ? "border-white/60" : "border-zinc-300", large && "text-base")}>{replyTarget ? `回复 ${replyTarget.sender_name}：${replyTarget.content}` : "回复一条历史消息"}</div>}
-          {message.deleted_at ? <p className={cn("italic opacity-65", large ? "text-lg" : "text-sm")}>消息已撤回</p> : isEditing ? (
-            <div className="w-72 max-w-full space-y-3 text-zinc-900"><Textarea value={editContent} onChange={(event) => setEditContent(event.target.value)} maxLength={2000} aria-label="编辑消息内容" /><InlineError error={editError} /><div className="flex justify-end gap-2"><Button size="sm" variant="secondary" onClick={() => setIsEditing(false)}>取消</Button><Button size="sm" onClick={saveEdit} isLoading={editMutation.isPending}>保存</Button></div></div>
+          {message.reply_to_id && <div className={cn("mb-2 border-l-2 pl-2 text-label-12 opacity-75", own ? "border-accent/30" : "border-neutral-5", large && "text-copy-14")}>{replyTarget ? `回复 ${replyTarget.sender_name}：${replyTarget.content}` : "回复一条历史消息"}</div>}
+          {message.deleted_at ? <p className={cn("italic opacity-65", large ? "text-copy-16" : "text-copy-14")}>消息已撤回</p> : isEditing ? (
+            <div className="w-72 max-w-full space-y-3 text-neutral-9"><Textarea value={editContent} onChange={(event) => setEditContent(event.target.value)} maxLength={2000} aria-label="编辑消息内容" /><InlineError error={editError} /><div className="flex justify-end gap-2"><Button size="sm" variant="secondary" onClick={() => setIsEditing(false)}>取消</Button><Button size="sm" onClick={saveEdit} isLoading={editMutation.isPending}>保存</Button></div></div>
           ) : (
-            <><p className={cn("whitespace-pre-wrap break-words leading-6", large && "text-lg leading-8")}>{message.content}</p>{(message.type === "image" || message.type === "file") && <FileAttachment message={message} large={large} />}</>
+            <><p className={cn("whitespace-pre-wrap break-words leading-6", large && "text-copy-16 leading-8")}>{message.content}</p>{(message.type === "image" || message.type === "file") && <FileAttachment message={message} large={large} />}</>
           )}
         </div>
-        {own && urgent && !message.delivery_state && !message.deleted_at && <ConfirmationDetails kind="message" id={message.id} summary="查看班级确认状态" className="mt-2 w-full" summaryClassName="cursor-pointer text-xs font-medium text-indigo-600" />}
-        <div className={cn("mt-1.5 flex min-h-7 items-center gap-1 text-zinc-400", own && "flex-row-reverse")}>
+        {own && urgent && !message.delivery_state && !message.deleted_at && <ConfirmationDetails kind="message" id={message.id} summary="查看班级确认状态" className="mt-2 w-full" summaryClassName="cursor-pointer text-label-12 font-medium text-accent" />}
+        <div className={cn("mt-1.5 flex min-h-7 items-center gap-1 text-neutral-6", own && "flex-row-reverse")}>
           {own && !message.deleted_at && (message.delivery_state === "sending" ? (
-            <span className={cn("mr-1 flex items-center gap-1 text-xs", large && "text-base")}><Checks className="h-3.5 w-3.5" />发送中</span>
+            <span className={cn("mr-1 flex items-center gap-1 text-label-12", large && "text-copy-14")}><Checks className="h-3.5 w-3.5" />发送中</span>
           ) : failed ? (
-            <button type="button" className={cn("mr-1 flex min-h-7 items-center gap-1 text-xs font-medium text-red-600", large && "min-h-12 text-base")} onClick={() => message.client_msg_id && onRetry?.(message.client_msg_id)} aria-label={`发送失败，重试：${message.error ?? "网络错误"}`}><WarningCircle className="h-4 w-4" />发送失败<ArrowClockwise className="h-3.5 w-3.5" />重试</button>
+            <button type="button" className={cn("mr-1 flex min-h-7 items-center gap-1 text-label-12 font-medium text-error", large && "min-h-12 text-copy-14")} onClick={() => message.client_msg_id && onRetry?.(message.client_msg_id)} aria-label={`发送失败，重试：${message.error ?? "网络错误"}`}><WarningCircle className="h-4 w-4" />发送失败<ArrowClockwise className="h-3.5 w-3.5" />重试</button>
           ) : (
-            <span className={cn("mr-1 flex items-center gap-1 text-xs", large && "text-base")}>{message.read_count > 0 ? <Checks className="h-3.5 w-3.5 text-sky-500" /> : (message.delivery_count ?? 0) > 0 ? <Checks className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}{message.read_count > 0 ? `${message.read_count} 人已读` : (message.delivery_count ?? 0) > 0 ? "已送达" : "已发送"}</span>
+            <span className={cn("mr-1 flex items-center gap-1 text-label-12", large && "text-copy-14")}>{message.read_count > 0 ? <Checks className="h-3.5 w-3.5 text-info" /> : (message.delivery_count ?? 0) > 0 ? <Checks className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}{message.read_count > 0 ? `${message.read_count} 人已读` : (message.delivery_count ?? 0) > 0 ? "已送达" : "已发送"}</span>
           ))}
           {!message.deleted_at && !isEditing && !message.delivery_state && (
             <div className="flex opacity-100 transition focus-within:opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
-              {onReply && <Button variant="ghost" size="sm" className={cn(large && "min-h-12 text-base")} onClick={() => onReply(message)}><ArrowBendUpLeft className="h-3.5 w-3.5" />回复</Button>}
-              {own && message.type === "text" && <Button variant="ghost" size="sm" className={cn(large && "min-h-12 text-base")} onClick={() => { setEditContent(message.content); setIsEditing(true); }}><PencilSimple className="h-3.5 w-3.5" />编辑</Button>}
-              {own && recallable && <Button variant="ghost" size="sm" className={cn("text-red-600", large && "min-h-12 text-base")} onClick={() => setConfirmRecall(true)}><Trash className="h-3.5 w-3.5" />撤回</Button>}
+              {onReply && <Button variant="ghost" size="sm" className={cn(large && "min-h-12 text-copy-14")} onClick={() => onReply(message)}><ArrowBendUpLeft className="h-3.5 w-3.5" />回复</Button>}
+              {own && message.type === "text" && <Button variant="ghost" size="sm" className={cn(large && "min-h-12 text-copy-14")} onClick={() => { setEditContent(message.content); setIsEditing(true); }}><PencilSimple className="h-3.5 w-3.5" />编辑</Button>}
+              {own && recallable && <Button variant="ghost" size="sm" className={cn("text-error", large && "min-h-12 text-copy-14")} onClick={() => setConfirmRecall(true)}><Trash className="h-3.5 w-3.5" />撤回</Button>}
             </div>
           )}
-          {message.confirmed_at && <span className="flex items-center gap-1 text-xs text-emerald-600"><Check className="h-3.5 w-3.5" />已确认</span>}
+          {message.confirmed_at && <span className="flex items-center gap-1 text-label-12 text-success"><Check className="h-3.5 w-3.5" />已确认</span>}
         </div>
       </div>
       <ConfirmDialog open={confirmRecall} title="撤回这条消息？" description="撤回后，会话成员将只能看到撤回状态。此操作无法撤销。" confirmLabel="撤回消息" isLoading={recallMutation.isPending} error={recallMutation.error} onClose={() => setConfirmRecall(false)} onConfirm={() => recallMutation.mutate()} />

@@ -30,11 +30,11 @@ export function TeacherUrgentDialog() {
   };
 
   return (
-    <Dialog open title={current.title} description="教师端仅查看紧急内容；班级确认由对应教室端完成。" onClose={dismiss} className="max-w-2xl border-red-200">
+    <Dialog open title={current.title} description="教师端仅查看紧急内容；班级确认由对应教室端完成。" onClose={dismiss} className="max-w-2xl border-error/30">
       <div className="space-y-5">
-        <div className="flex items-center gap-3 text-red-700"><Siren className="h-7 w-7" /><p className="font-medium">{current.sender ? `来自 ${current.sender}` : "校园紧急通知"}</p></div>
-        {current.className && <p className="text-sm font-medium text-zinc-600">目标班级：{current.className}</p>}
-        <p className="whitespace-pre-wrap break-words text-lg leading-8 text-zinc-900">{current.content}</p>
+        <div className="flex items-center gap-3 text-error"><Siren className="h-7 w-7" /><p className="font-medium">{current.sender ? `来自 ${current.sender}` : "校园紧急通知"}</p></div>
+        {current.className && <p className="text-copy-14 font-medium text-neutral-7">目标班级：{current.className}</p>}
+        <p className="whitespace-pre-wrap break-words text-copy-16 leading-8 text-neutral-9">{current.content}</p>
         <div className="flex justify-end"><Button variant={current.channelId ? "primary" : "secondary"} onClick={current.channelId ? openChannel : dismiss}>{current.channelId ? "查看对应通道" : "知道了"}</Button></div>
       </div>
     </Dialog>

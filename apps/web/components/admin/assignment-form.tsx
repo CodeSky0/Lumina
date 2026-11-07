@@ -38,7 +38,7 @@ export function AssignmentForm({ open, assignment, lookups, onClose }: {
       <div className="space-y-2"><Label htmlFor="assignment-class">授课班级</Label><Select id="assignment-class" value={classId} onChange={(event) => setClassId(event.target.value)} required><option value="">请选择班级</option>{lookups.classes.map((item) => <option key={item.id} value={item.id}>{item.grade} · {item.name}</option>)}</Select></div>
       <div className="space-y-2"><Label htmlFor="assignment-subject">教授科目</Label><Select id="assignment-subject" value={subjectId} onChange={(event) => setSubjectId(event.target.value)} required><option value="">请选择科目</option>{lookups.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</Select></div>
       {mutation.isError && <InlineError error={mutation.error} />}
-      <div className="flex justify-end gap-3 border-t border-zinc-100 pt-5"><Button type="button" variant="secondary" onClick={onClose} disabled={mutation.isPending}>取消</Button><Button type="submit" isLoading={mutation.isPending}>{assignment ? "保存任务" : "创建任务与通道"}</Button></div>
+      <div className="flex justify-end gap-3 border-t border-border pt-5"><Button type="button" variant="secondary" onClick={onClose} disabled={mutation.isPending}>取消</Button><Button type="submit" isLoading={mutation.isPending}>{assignment ? "保存任务" : "创建任务与通道"}</Button></div>
     </form>
   </Dialog>;
 }

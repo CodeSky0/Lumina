@@ -39,7 +39,7 @@ export function ClassroomChat({ channel, onClose }: { channel?: Channel; onClose
   }, [channel?.id, setActiveChannel]);
 
   return (
-    <Dialog open={Boolean(channel)} title={channel?.name ?? "班级消息"} description={[channel?.subject_name, channel?.teacher_name].filter(Boolean).join(" · ") || "本班实时消息"} onClose={onClose} className="flex h-[88dvh] max-w-6xl flex-col p-0 sm:p-0">
+    <Dialog open={Boolean(channel)} title={channel?.name ?? "班级消息"} description={[channel?.subject_name, channel?.teacher_name].filter(Boolean).join(" · ") || "本班实时消息"} onClose={onClose} className="flex h-[88dvh] max-w-6xl flex-col p-0 sm:p-0 [&>div:first-child]:px-5 [&>div:first-child]:pt-5 sm:[&>div:first-child]:px-8 sm:[&>div:first-child]:pt-6">
       <div className="chat-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-6 sm:px-8">
         {readMutation.isError && <InlineError error={readMutation.error} />}
         {messagesQuery.isPending ? <ListSkeleton rows={4} /> : messagesQuery.isError ? <ErrorState error={messagesQuery.error} onRetry={() => void messagesQuery.refetch()} /> : messages.length === 0 ? <EmptyState icon={<ChatsCircle className="h-7 w-7" />} title="本科目还没有消息" description="教师发送的消息会实时显示在这里，无需刷新页面。" /> : <>
@@ -48,7 +48,7 @@ export function ClassroomChat({ channel, onClose }: { channel?: Channel; onClose
         </>}
       </div>
       {channel && <Composer channel={channel} replyTo={replyTo} onCancelReply={() => setReplyTo(undefined)} allowedTypes={["text"]} large />}
-      <div className="border-t border-zinc-100 px-5 py-4 text-base text-zinc-500">消息通过实时连接更新；断线恢复后会自动向服务端同步。</div>
+      <div className="y-meta border-t border-border px-5 py-4 text-label-12 text-neutral-6">消息通过实时连接更新；断线恢复后会自动向服务端同步。</div>
     </Dialog>
   );
 }
