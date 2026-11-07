@@ -83,9 +83,32 @@
   --shadow-whisper: 0 4px 24px rgba(20, 19, 18, 0.05);
   --shadow-whisper-lg: 0 6px 32px rgba(20, 19, 18, 0.06);
 
-  /* Breathing motion. */
-  --animate-enter: enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* Motion physics. One breathing curve for entrances, one spring for
+     tactile feedback. Never mix in a third easing by hand. */
+  --ease-breath: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Entrance choreography. */
+  --animate-enter: enter 0.45s var(--ease-breath) both;
   --animate-pulseSoft: pulseSoft 2.4s ease-in-out infinite;
+  --animate-rise: rise 0.62s var(--ease-breath) both;
+  --animate-fadeIn: fadeIn 0.5s var(--ease-breath) both;
+  --animate-panelIn: panelIn 0.42s var(--ease-spring) both;
+  --animate-backdropIn: backdropIn 0.28s ease both;
+  --animate-drawerIn: drawerIn 0.34s var(--ease-breath) both;
+  --animate-chatIn: chatIn 0.4s var(--ease-breath) both;
+  --animate-slideDown: slideDown 0.38s var(--ease-breath) both;
+  --animate-toastIn: toastIn 0.46s var(--ease-spring) both;
+  --animate-pop: pop 0.5s var(--ease-spring) both;
+  --animate-msgIn: msgIn 0.42s var(--ease-breath) both;
+  --animate-msgInOwn: msgInOwn 0.42s var(--ease-breath) both;
+
+  /* Perpetual motion, kept slow and low-amplitude. */
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-drift: drift 24s ease-in-out infinite alternate;
+  --animate-breathe: breathe 4.5s ease-in-out infinite;
+  --animate-toastLife: toastLife 4s linear forwards;
+  --animate-shimmer: shimmer 1.6s infinite;
 
   @keyframes enter {
     from {
@@ -111,6 +134,173 @@
   @keyframes shimmer {
     100% {
       transform: translateX(100%);
+    }
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes panelIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes backdropIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes drawerIn {
+    from {
+      opacity: 0;
+      transform: translateX(-14px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes chatIn {
+    from {
+      opacity: 0;
+      transform: translateX(18px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translate(-50%, -12px);
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+  }
+
+  @keyframes toastIn {
+    from {
+      opacity: 0;
+      transform: translateY(16px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes pop {
+    0% {
+      opacity: 0;
+      transform: scale(0.6);
+    }
+    60% {
+      opacity: 1;
+      transform: scale(1.06);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes msgIn {
+    from {
+      opacity: 0;
+      transform: translate3d(-8px, 4px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes msgInOwn {
+    from {
+      opacity: 0;
+      transform: translate3d(8px, 4px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+
+  @keyframes drift {
+    from {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    to {
+      transform: translate3d(4%, -3%, 0) scale(1.08);
+    }
+  }
+
+  @keyframes orbit {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes breathe {
+    0%,
+    100% {
+      opacity: 0.72;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.05);
+    }
+  }
+
+  @keyframes toastLife {
+    from {
+      transform: scaleX(1);
+    }
+    to {
+      transform: scaleX(0);
     }
   }
 }
@@ -213,6 +403,11 @@
     font-family: var(--font-serif);
     font-weight: 500;
     letter-spacing: -0.005em;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
   }
 
   button,
@@ -270,6 +465,129 @@
   letter-spacing: 0.01em;
 }
 
+/* ---------------------------------------------------------------------------
+ * Motion & material utilities
+ * CSS-only so no extra runtime ships to the classroom screens. Every rule is
+ * transform/opacity based; the global reduced-motion block below neutralises
+ * it for users who ask for less movement.
+ * ------------------------------------------------------------------------- */
+
+/* Page-level fade. Opacity only — a transform here would turn the wrapper into
+   the containing block for position: fixed dialogs and break full-screen layers. */
+.page-enter {
+  animation: fadeIn 0.45s var(--ease-breath) both;
+}
+
+/* Hover elevation. Scoped to pointer devices so touch screens don't get stuck. */
+.lift {
+  transition:
+    transform 0.4s var(--ease-breath),
+    box-shadow 0.4s var(--ease-breath),
+    background-color 0.4s var(--ease-breath),
+    border-color 0.4s var(--ease-breath);
+}
+@media (hover: hover) {
+  .lift:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-whisper);
+  }
+}
+.lift:active {
+  transform: translateY(-1px) scale(0.996);
+}
+
+/* A single pass of light across a surface, as if the paper caught the window. */
+.sheen {
+  position: relative;
+  overflow: hidden;
+}
+.sheen::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 32%,
+    color-mix(in srgb, var(--color-accent) 10%, transparent) 50%,
+    transparent 68%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.9s var(--ease-breath);
+}
+@media (hover: hover) {
+  .sheen:hover::after {
+    transform: translateX(120%);
+  }
+}
+
+/* Accent hairline that stretches under a card on hover. */
+.hairline {
+  transform-origin: left center;
+  transition: transform 0.45s var(--ease-breath);
+}
+@media (hover: hover) {
+  .group:hover .hairline {
+    transform: scaleX(1.9);
+  }
+}
+
+/* Sidebar marker drawn from the centre on activation. Replaces a hard border. */
+.nav-link {
+  position: relative;
+}
+.nav-link::before {
+  content: "";
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  left: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--color-accent);
+  transform: scaleY(0);
+  transition: transform 0.32s var(--ease-breath);
+}
+.nav-link[aria-current="page"]::before {
+  transform: scaleY(1);
+}
+
+/* Login ambience: two slow, out-of-focus pools of colour and one drifting ring. */
+.ambient-blob {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(58px);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.orbit-ring {
+  animation: orbit 48s linear infinite;
+}
+
+/* Paper grain. Fixed, pointer-transparent, kept far below readability threshold. */
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.026;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 140px 140px;
+  mix-blend-mode: multiply;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .grain {
+    opacity: 0.05;
+    mix-blend-mode: screen;
+  }
+}
+.dark .grain,
+[data-theme="dark"] .grain {
+  opacity: 0.05;
+  mix-blend-mode: screen;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -278,5 +596,15 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .lift:hover,
+  .lift:active,
+  .group:hover .hairline {
+    transform: none !important;
+  }
+
+  .sheen::after {
+    display: none !important;
   }
 }

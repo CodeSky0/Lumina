@@ -12,7 +12,7 @@ export function EmptyState({ icon, title, description, action }: {
 }) {
   return (
     <div className="flex min-h-56 flex-col items-center justify-center px-6 py-12 text-center">
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-neutral-2 text-neutral-6">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-neutral-2 text-neutral-6 animate-float">
         {icon ?? <Info className="h-6 w-6" aria-hidden="true" />}
       </div>
       <h3 className="text-title-20 font-medium text-neutral-10">{title}</h3>

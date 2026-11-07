@@ -31,7 +31,7 @@ function AuthorizedImage({ id, alt }: { id: string; alt: string }) {
 
   if (error) return <div className="flex min-h-28 items-center gap-2 rounded-md bg-error/8 p-4 text-copy-14 text-error"><WarningCircle className="h-5 w-5" />图片加载失败<Button variant="ghost" size="sm" onClick={() => setAttempt((value) => value + 1)}>重试</Button></div>;
   if (!url) return <Skeleton className="h-52 w-full max-w-md" />;
-  return <img src={url} alt={alt} className="max-h-96 w-auto max-w-full rounded-md border border-border object-contain" />;
+  return <img src={url} alt={alt} className="max-h-96 w-auto max-w-full animate-fadeIn rounded-md border border-border object-contain shadow-whisper" />;
 }
 
 export function FileAttachment({ message, large = false }: { message: Message; large?: boolean }) {
@@ -51,7 +51,7 @@ export function FileAttachment({ message, large = false }: { message: Message; l
   return (
     <div className="mt-2 space-y-2">
       {message.type === "image" ? <AuthorizedImage id={id} alt={name} /> : (
-        <div className="flex min-w-0 items-center gap-3 rounded-md border border-border bg-paper/80 p-3">
+        <div className="flex min-w-0 animate-rise items-center gap-3 rounded-md border border-border bg-paper/80 p-3">
           <FileIcon className="h-7 w-7 shrink-0 text-accent" aria-hidden="true" />
           <div className="min-w-0 flex-1"><p className="truncate text-copy-14 font-medium text-neutral-9">{name}</p><p className="text-label-12 text-neutral-7">{formatFileSize(message.metadata.size)}</p></div>
           <Button variant="ghost" size={large ? "touchIcon" : "icon"} onClick={download} isLoading={isDownloading} aria-label={`下载 ${name}`}><DownloadSimple className="h-5 w-5" /></Button>

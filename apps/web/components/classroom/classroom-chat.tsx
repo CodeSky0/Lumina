@@ -44,7 +44,7 @@ export function ClassroomChat({ channel, onClose }: { channel?: Channel; onClose
         {readMutation.isError && <InlineError error={readMutation.error} />}
         {messagesQuery.isPending ? <ListSkeleton rows={4} /> : messagesQuery.isError ? <ErrorState error={messagesQuery.error} onRetry={() => void messagesQuery.refetch()} /> : messages.length === 0 ? <EmptyState icon={<ChatsCircle className="h-7 w-7" />} title="本科目还没有消息" description="教师发送的消息会实时显示在这里，无需刷新页面。" /> : <>
           {messagesQuery.hasNextPage && <div className="mb-4 flex justify-center"><Button size="touch" variant="secondary" onClick={() => void messagesQuery.fetchNextPage()} isLoading={messagesQuery.isFetchingNextPage}><ArrowUp className="h-5 w-5" />查看更早消息</Button></div>}
-          <div role="log" aria-live="polite">{user && messages.map((message) => <MessageItem key={message.id} message={message} currentUserId={user.id} replyTarget={message.reply_to_id ? messageMap.get(message.reply_to_id) : undefined} large onRead={onRead} onReply={setReplyTo} onRetry={retry} />)}</div>
+          <div role="log" aria-live="polite">{user && messages.map((message, index) => <MessageItem key={message.id} index={index} message={message} currentUserId={user.id} replyTarget={message.reply_to_id ? messageMap.get(message.reply_to_id) : undefined} large onRead={onRead} onReply={setReplyTo} onRetry={retry} />)}</div>
         </>}
       </div>
       {channel && <Composer channel={channel} replyTo={replyTo} onCancelReply={() => setReplyTo(undefined)} allowedTypes={["text"]} large />}

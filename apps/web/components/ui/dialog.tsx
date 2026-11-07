@@ -52,14 +52,14 @@ export function Dialog({ open, title, description, children, onClose, blocking =
   if (!open) return null;
   return (
     <div className={cn("fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6", fullscreen && "p-0 sm:p-0")} role="presentation">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={blocking ? undefined : onClose} aria-hidden="true" />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-backdropIn" onClick={blocking ? undefined : onClose} aria-hidden="true" />
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
-        className={cn("relative max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-border bg-paper p-6 shadow-whisper-lg animate-enter sm:p-7", className, fullscreen && "flex h-[100dvh] max-h-none max-w-none flex-col justify-center rounded-none p-8 sm:p-12")}
+        className={cn("relative max-h-[90dvh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-2xl border border-border bg-paper p-6 shadow-whisper-lg sm:p-7", fullscreen ? "animate-fadeIn" : "animate-panelIn", className, fullscreen && "flex h-[100dvh] max-h-none max-w-none flex-col justify-center rounded-none p-8 sm:p-12")}
       >
         <div className="mb-6 flex items-start justify-between gap-5">
           <div>

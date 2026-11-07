@@ -20,13 +20,14 @@ interface MessageItemProps {
   message: Message;
   currentUserId: string;
   replyTarget?: Message;
+  index?: number;
   large?: boolean;
   onReply?: (message: Message) => void;
   onRead: (message: Message) => Promise<void>;
   onRetry?: (clientMsgId: string) => void;
 }
 
-export function MessageItem({ message, currentUserId, replyTarget, large = false, onReply, onRead, onRetry }: MessageItemProps) {
+export function MessageItem({ message, currentUserId, replyTarget, index = 0, large = false, onReply, onRead, onRetry }: MessageItemProps) {
   const queryClient = useQueryClient();
   const articleRef = useRef<HTMLElement>(null);
   const readSent = useRef(false);
@@ -89,23 +90,23 @@ export function MessageItem({ message, currentUserId, replyTarget, large = false
   }
 
   if (message.type === "system") {
-    return <article ref={articleRef} className="flex justify-center py-2"><p className={cn("rounded-full bg-neutral-2 px-4 py-2 text-center text-neutral-7", large ? "text-copy-16" : "text-label-12")}>{message.content}</p></article>;
+    return <article ref={articleRef} className="flex justify-center py-2 animate-fadeIn"><p className={cn("rounded-full bg-neutral-2 px-4 py-2 text-center text-neutral-7", large ? "text-copy-16" : "text-label-12")}>{message.content}</p></article>;
   }
 
   const urgent = message.type === "urgent";
   return (
-    <article ref={articleRef} className={cn("group flex gap-3 px-1 py-3", own && "flex-row-reverse")} aria-label={`${message.sender_name}发送的消息`}>
-      <div className={cn("flex h-9 w-9 shrink-0 select-none items-center justify-center rounded-md text-label-12 font-medium", own ? "bg-accent/10 text-accent" : "bg-neutral-3 text-neutral-7", large && "h-12 w-12 text-copy-14")} aria-hidden="true">{message.sender_name.slice(0, 1)}</div>
+    <article ref={articleRef} className={cn("group flex gap-3 px-1 py-3", own ? "flex-row-reverse animate-msgInOwn" : "animate-msgIn")} style={{ animationDelay: `${Math.min(index, 6) * 24}ms` }} aria-label={`${message.sender_name}发送的消息`}>
+      <div className={cn("flex h-9 w-9 shrink-0 select-none items-center justify-center rounded-md text-label-12 font-medium transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105", own ? "bg-accent/10 text-accent" : "bg-neutral-3 text-neutral-7", large && "h-12 w-12 text-copy-14")} aria-hidden="true">{message.sender_name.slice(0, 1)}</div>
       <div className={cn("min-w-0 max-w-[82%] sm:max-w-[72%]", own && "flex flex-col items-end")}>
         <div className={cn("mb-1.5 flex items-center gap-2 text-label-12 text-neutral-6", own && "flex-row-reverse", large && "text-copy-14")}><span className="font-medium text-neutral-7">{message.sender_name}</span><time className="y-meta" dateTime={message.created_at}>{formatDateTime(message.created_at)}</time></div>
         <div className={cn(
-          "rounded-lg border px-4 py-3",
+          "rounded-lg border px-4 py-3 transition-[transform,box-shadow,border-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-px",
           own ? "rounded-tr-md border-accent/20 bg-accent/8 text-neutral-9" : "rounded-tl-md border-border bg-neutral-2 text-neutral-9",
           urgent && "border-error/25 bg-error/8 text-neutral-9",
           failed && "border-error/30 bg-neutral-2 text-neutral-7",
           large && "px-5 py-4 text-copy-16 leading-8",
         )}>
-          {urgent && <Badge tone="red" className="mb-2">紧急通知 · 需教室确认</Badge>}
+          {urgent && <Badge tone="red" className="mb-2 animate-breathe">紧急通知 · 需教室确认</Badge>}
           {message.reply_to_id && <div className={cn("mb-2 border-l-2 pl-2 text-label-12 opacity-75", own ? "border-accent/30" : "border-neutral-5", large && "text-copy-14")}>{replyTarget ? `回复 ${replyTarget.sender_name}：${replyTarget.content}` : "回复一条历史消息"}</div>}
           {message.deleted_at ? <p className={cn("italic opacity-65", large ? "text-copy-16" : "text-copy-14")}>消息已撤回</p> : isEditing ? (
             <div className="w-72 max-w-full space-y-3 text-neutral-9"><Textarea value={editContent} onChange={(event) => setEditContent(event.target.value)} maxLength={2000} aria-label="编辑消息内容" /><InlineError error={editError} /><div className="flex justify-end gap-2"><Button size="sm" variant="secondary" onClick={() => setIsEditing(false)}>取消</Button><Button size="sm" onClick={saveEdit} isLoading={editMutation.isPending}>保存</Button></div></div>

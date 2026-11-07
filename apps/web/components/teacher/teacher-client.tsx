@@ -57,8 +57,8 @@ function TeacherWorkspace() {
         </div>
       </header>
       <main id="main-content" className="grid min-h-0 flex-1 md:grid-cols-[340px_minmax(0,1fr)] xl:grid-cols-[380px_minmax(0,1fr)]">
-        <aside className={cn("min-h-0 border-r border-border bg-neutral-1", mobileChat ? "hidden md:block" : "block")} aria-label="会话导航"><ChannelList selectedId={selected?.id} onSelect={selectChannel} /></aside>
-        <div className={cn("min-h-0", mobileChat ? "block" : "hidden md:block")}><ChatWindow channel={activeChannel} onBack={() => setMobileChat(false)} /></div>
+        <aside className={cn("min-h-0 border-r border-border bg-neutral-1", mobileChat ? "hidden md:block" : "block animate-drawerIn md:animate-none")} aria-label="会话导航"><ChannelList selectedId={selected?.id} onSelect={selectChannel} /></aside>
+        <div className={cn("min-h-0", mobileChat ? "block animate-chatIn md:animate-none" : "hidden md:block")}><ChatWindow channel={activeChannel} onBack={() => setMobileChat(false)} /></div>
       </main>
       <BatchNoticeDialog open={batchOpen} channels={channelsQuery.data ?? []} onClose={() => setBatchOpen(false)} />
     </div>

@@ -68,7 +68,7 @@ export function ChatWindow({ channel, onBack }: { channel?: Channel; onBack?: ()
             {messagesQuery.hasNextPage && <div className="mb-3 flex justify-center"><Button variant="ghost" size="sm" onClick={() => void messagesQuery.fetchNextPage()} isLoading={messagesQuery.isFetchingNextPage}><ArrowUp className="h-4 w-4" />加载更早消息</Button></div>}
             {messages.length === 0 ? <EmptyState title={query ? "没有找到相关消息" : "会话还没有消息"} description={query ? "搜索仅覆盖你有权访问的当前通道，请尝试其他关键词。" : "发送第一条消息，开始这个通道的沟通。"} /> : (
               <div role="log" aria-live="polite" aria-relevant="additions" className="mx-auto max-w-4xl">
-                {messages.map((message) => <MessageItem key={message.id} message={message} currentUserId={user.id} replyTarget={message.reply_to_id ? messageMap.get(message.reply_to_id) : undefined} onReply={setReplyTo} onRead={onRead} onRetry={retry} />)}
+                {messages.map((message, index) => <MessageItem key={message.id} index={index} message={message} currentUserId={user.id} replyTarget={message.reply_to_id ? messageMap.get(message.reply_to_id) : undefined} onReply={setReplyTo} onRead={onRead} onRetry={retry} />)}
               </div>
             )}
             <div ref={endRef} aria-hidden="true" />

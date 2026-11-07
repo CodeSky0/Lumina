@@ -18,7 +18,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="zh-CN">
-      <body><a href="#main-content" className="skip-link">跳到主要内容</a><Providers>{children}</Providers></body>
+      <body><div className="grain" aria-hidden="true" /><a href="#main-content" className="skip-link">跳到主要内容</a><Providers>{children}</Providers></body>
     </html>
   );
 }
