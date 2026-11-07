@@ -50,13 +50,13 @@ export function DeviceCodeDialog({ open, record, onClose }: { open: boolean; rec
   }
 
   return <Dialog open={open} title={`轮换${String(record?.name ?? "班级")}设备码`} description={result?.notice ?? "轮换后旧设备码立即失效。新设备码仅在本次对话框中显示，不会写入浏览器持久化存储。"} onClose={mutation.isPending ? undefined : close}>
-    {result ? <div className="space-y-5">
-      <div className="rounded-lg border border-success/25 bg-success/10 p-5">
+    {result ? <div className="animate-panelIn space-y-5">
+      <div className="animate-rise rounded-lg border border-success/25 bg-success/10 p-5">
         <p className="text-copy-14 font-medium text-success">请立即复制并安全保存</p>
-        <code className="mt-3 block select-all break-all rounded-md bg-paper px-4 py-3 text-center font-mono text-title-20 tracking-wider text-neutral-10">{result.code}</code>
+        <code className="animate-fadeIn mt-3 block select-all break-all rounded-md bg-paper px-4 py-3 text-center font-mono text-title-20 tracking-wider text-neutral-10">{result.code}</code>
       </div>
       {copyError && <InlineError error={copyError} />}
-      <div className="flex justify-end gap-3"><Button variant="secondary" onClick={close}>关闭</Button><Button onClick={() => void copyCode()}>{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}{copied ? "已复制" : "复制设备码"}</Button></div>
+      <div className="flex justify-end gap-3"><Button variant="secondary" onClick={close}>关闭</Button><Button onClick={() => void copyCode()}>{copied ? <Check className="h-4 w-4 animate-pop" /> : <Copy className="h-4 w-4" />}{copied ? "已复制" : "复制设备码"}</Button></div>
     </div> : <div className="space-y-5">
       {mutation.error && <InlineError error={mutation.error} />}
       <div className="flex justify-end gap-3"><Button variant="secondary" onClick={close} disabled={mutation.isPending}>取消</Button><Button variant="warning" onClick={() => mutation.mutate()} isLoading={mutation.isPending}><Key className="h-4 w-4" />确认轮换</Button></div>
